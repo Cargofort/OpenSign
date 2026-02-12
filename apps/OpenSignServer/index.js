@@ -15,7 +15,17 @@ import AWS from 'aws-sdk';
 import { app as customRoute } from './cloud/customRoute/customApp.js';
 import { exec } from 'child_process';
 import { createTransport } from 'nodemailer';
-import { appName, cloudServerUrl, serverAppId, smtpenable, smtpsecure, useLocal } from './Utils.js';
+import {
+  appName,
+  cloudServerUrl,
+  formatFromHeader,
+  getResolvedMailSender,
+  getSmtpEnvelopeFrom,
+  serverAppId,
+  smtpenable,
+  smtpsecure,
+  useLocal,
+} from './Utils.js';
 import { SSOAuth } from './auth/authadapter.js';
 import runDbMigrations from './migrationdb/index.js';
 import { validateSignedLocalUrl } from './cloud/parsefunction/getSignedUrl.js';
@@ -58,6 +68,8 @@ if (useLocal !== 'true') {
 let transporterMail;
 let mailgunClient;
 let mailgunDomain;
+let senderAddress;
+let smtpEnvelopeFrom;
 let isMailAdapter = false;
 if (smtpenable) {
   try {
@@ -67,15 +79,11 @@ if (smtpenable) {
       secure: smtpsecure,
     };
 
-    // ✅ Add auth only if BOTH username & password exist
-    const smtpUser = process.env.SMTP_USERNAME;
+    const smtpUser = process.env.SMTP_USERNAME || process.env.SMTP_USER_EMAIL;
     const smtpPass = process.env.SMTP_PASS;
 
     if (smtpUser && smtpPass) {
-      transporterConfig.auth = {
-        user: process.env.SMTP_USERNAME ? process.env.SMTP_USERNAME : process.env.SMTP_USER_EMAIL,
-        pass: smtpPass,
-      };
+      transporterConfig.auth = { user: smtpUser, pass: smtpPass };
     }
     transporterMail = createTransport(transporterConfig);
     await transporterMail.verify();
@@ -98,7 +106,19 @@ if (smtpenable) {
     console.log('Please provide valid Mailgun credentials');
   }
 }
-const mailsender = smtpenable ? process.env.SMTP_USER_EMAIL : process.env.MAILGUN_SENDER;
+if (isMailAdapter) {
+  try {
+    const resolvedSender = getResolvedMailSender({ isSmtp: smtpenable });
+    senderAddress = formatFromHeader(appName, resolvedSender);
+    if (smtpenable) {
+      smtpEnvelopeFrom = getSmtpEnvelopeFrom(resolvedSender);
+    }
+  } catch (err) {
+    isMailAdapter = false;
+    console.log(`Please provide valid sender configuration: ${err.message}`);
+  }
+}
+
 export const config = {
   databaseURI:
     process.env.DATABASE_URI || process.env.MONGODB_URI || 'mongodb://localhost:27017/dev',
@@ -127,7 +147,7 @@ export const config = {
           module: 'parse-server-api-mail-adapter',
           options: {
             // The email address from which emails are sent.
-            sender: appName + ' <' + mailsender + '>',
+            sender: senderAddress,
             // The email templates.
             templates: {
               // The template used by Parse Server to send an email for password
@@ -149,7 +169,13 @@ export const config = {
               if (mailgunClient) {
                 const mailgunPayload = ApiPayloadConverter.mailgun(payload);
                 await mailgunClient.messages.create(mailgunDomain, mailgunPayload);
-              } else if (transporterMail) await transporterMail.sendMail(payload);
+              } else if (transporterMail) {
+                const smtpPayload =
+                  smtpenable && smtpEnvelopeFrom
+                    ? { ...payload, envelope: { from: smtpEnvelopeFrom } }
+                    : payload;
+                await transporterMail.sendMail(smtpPayload);
+              }
             },
           },
         },

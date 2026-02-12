@@ -2,7 +2,14 @@ import fs from 'node:fs';
 import https from 'https';
 import formData from 'form-data';
 import Mailgun from 'mailgun.js';
-import { smtpenable, smtpsecure, updateMailCount } from '../../Utils.js';
+import {
+  formatFromHeader,
+  getResolvedMailSender,
+  getSmtpEnvelopeFrom,
+  smtpenable,
+  smtpsecure,
+  updateMailCount,
+} from '../../Utils.js';
 import { createTransport } from 'nodemailer';
 import axios from 'axios';
 async function sendMailProvider(req, plan, monthchange) {
@@ -18,15 +25,11 @@ async function sendMailProvider(req, plan, monthchange) {
         secure: smtpsecure,
       };
 
-      // ✅ Add auth only if BOTH username & password exist
-      const smtpUser = process.env.SMTP_USERNAME;
+      const smtpUser = process.env.SMTP_USERNAME || process.env.SMTP_USER_EMAIL;
       const smtpPass = process.env.SMTP_PASS;
 
       if (smtpUser && smtpPass) {
-        transporterConfig.auth = {
-          user: process.env.SMTP_USERNAME ? process.env.SMTP_USERNAME : process.env.SMTP_USER_EMAIL,
-          pass: smtpPass,
-        };
+        transporterConfig.auth = { user: smtpUser, pass: smtpPass };
       }
       transporterSMTP = createTransport(transporterConfig);
     } else {
@@ -118,10 +121,10 @@ async function sendMailProvider(req, plan, monthchange) {
             attachment = [file];
           }
           const from = req.params.from || '';
-          const mailsender = smtpenable ? process.env.SMTP_USER_EMAIL : process.env.MAILGUN_SENDER;
+          const senderEmail = getResolvedMailSender({ isSmtp: smtpenable });
           const replyto = req.params?.replyto || '';
           const messageParams = {
-            from: from + ' <' + mailsender + '>',
+            from: formatFromHeader(from, senderEmail),
             to: req.params.recipient,
             subject: req.params.subject,
             text: req.params.text || 'mail',
@@ -131,6 +134,9 @@ async function sendMailProvider(req, plan, monthchange) {
             bcc: req.params.bcc ? req.params.bcc : undefined,
             replyTo: replyto ? replyto : undefined,
           };
+          if (smtpenable) {
+            messageParams.envelope = { from: getSmtpEnvelopeFrom(senderEmail) };
+          }
           if (transporterSMTP) {
             const res = await transporterSMTP.sendMail(messageParams);
             console.log('smtp transporter res: ', res?.response);
@@ -212,10 +218,10 @@ async function sendMailProvider(req, plan, monthchange) {
       }
     } else {
       const from = req.params.from || '';
-      const mailsender = smtpenable ? process.env.SMTP_USER_EMAIL : process.env.MAILGUN_SENDER;
+      const senderEmail = getResolvedMailSender({ isSmtp: smtpenable });
       const replyto = req.params?.replyto || '';
       const messageParams = {
-        from: from + ' <' + mailsender + '>',
+        from: formatFromHeader(from, senderEmail),
         to: req.params.recipient,
         subject: req.params.subject,
         text: req.params.text || 'mail',
@@ -223,6 +229,9 @@ async function sendMailProvider(req, plan, monthchange) {
         bcc: req.params.bcc ? req.params.bcc : undefined,
         replyTo: replyto ? replyto : undefined,
       };
+      if (smtpenable) {
+        messageParams.envelope = { from: getSmtpEnvelopeFrom(senderEmail) };
+      }
 
       if (transporterSMTP) {
         const res = await transporterSMTP.sendMail(messageParams);

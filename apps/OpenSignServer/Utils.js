@@ -160,6 +160,52 @@ export const smtpsecure = process.env.SMTP_PORT && process.env.SMTP_PORT !== '46
 export const smtpenable =
   process.env.SMTP_ENABLE && process.env.SMTP_ENABLE.toLowerCase() === 'true' ? true : false;
 export const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const normalizeMailValue = value => (typeof value === 'string' ? value.trim() : '');
+
+export const isValidEmail = value => emailRegex.test(normalizeMailValue(value));
+
+export const getResolvedMailSender = ({ isSmtp = smtpenable } = {}) => {
+  if (isSmtp) {
+    const smtpUserEmail = normalizeMailValue(process.env.SMTP_USER_EMAIL);
+    if (isValidEmail(smtpUserEmail)) {
+      return smtpUserEmail;
+    }
+
+    const smtpUsername = normalizeMailValue(process.env.SMTP_USERNAME);
+    if (isValidEmail(smtpUsername)) {
+      return smtpUsername;
+    }
+
+    throw new Error('Invalid SMTP sender. Set SMTP_USER_EMAIL to a valid email address.');
+  }
+
+  const mailgunSender = normalizeMailValue(process.env.MAILGUN_SENDER);
+  if (isValidEmail(mailgunSender)) {
+    return mailgunSender;
+  }
+
+  throw new Error('Invalid MAILGUN_SENDER. Set it to a valid email address.');
+};
+
+export const getSmtpEnvelopeFrom = senderEmail => {
+  const smtpMailFrom = normalizeMailValue(process.env.SMTP_MAIL_FROM);
+  if (!smtpMailFrom) {
+    return senderEmail;
+  }
+
+  if (isValidEmail(smtpMailFrom)) {
+    return smtpMailFrom;
+  }
+
+  throw new Error('Invalid SMTP_MAIL_FROM. Set it to a valid email address.');
+};
+
+export const formatFromHeader = (displayName, senderEmail) => {
+  const safeSender = normalizeMailValue(senderEmail);
+  const safeDisplayName = normalizeMailValue(displayName);
+  return safeDisplayName ? `${safeDisplayName} <${safeSender}>` : safeSender;
+};
+
 export function signPayload(payload, secret) {
   if (payload && secret) {
     const signature = crypto

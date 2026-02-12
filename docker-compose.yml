@@ -28,6 +28,9 @@ services:
     networks:
       - app-network
   client:
+    build:
+      context: .
+      dockerfile: apps/OpenSign/Dockerhubfile
     image: opensign/opensign:main
     container_name: OpenSign-container
     depends_on:

@@ -1,4 +1,4 @@
-import { appName, smtpenable, updateMailCount } from '../../Utils.js';
+import { appName, formatFromHeader, getResolvedMailSender, smtpenable, updateMailCount } from '../../Utils.js';
 async function getDocument(docId) {
   try {
     const query = new Parse.Query('contracts_Document');
@@ -26,10 +26,10 @@ async function sendMailOTPv1(request) {
 
     if (email) {
       const recipient = request.params.email;
-      const mailsender = smtpenable ? process.env.SMTP_USER_EMAIL : process.env.MAILGUN_SENDER;
+      const senderEmail = getResolvedMailSender({ isSmtp: smtpenable });
       try {
         await Parse.Cloud.sendEmail({
-          sender: AppName + ' <' + mailsender + '>',
+          sender: formatFromHeader(AppName, senderEmail),
           recipient: recipient,
           subject: `Your ${AppName} OTP`,
           text: 'otp email',

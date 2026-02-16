@@ -56,6 +56,14 @@ services:
       - app-network
     environment:
       - HOST_URL=${HOST_URL:-localhost:3001}
+  mailcatcher:
+    image: schickling/mailcatcher:latest
+    container_name: mailcatcher-container
+    ports:
+      - "1025:1025"   # SMTP
+      - "1080:1080"   # Web UI
+    networks:
+      - app-network
 networks:
   app-network:
     driver: bridge

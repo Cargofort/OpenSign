@@ -3,6 +3,7 @@ import https from 'https';
 import formData from 'form-data';
 import Mailgun from 'mailgun.js';
 import {
+  renderBrandedEmailHtml,
   formatFromHeader,
   getResolvedMailSender,
   getSmtpEnvelopeFrom,
@@ -18,6 +19,14 @@ async function sendMailProvider(req) {
 
   const mailgunApiKey = process.env.MAILGUN_API_KEY;
   try {
+    const brandedHtml =
+      req.params?.applyBranding && req.params?.html
+        ? await renderBrandedEmailHtml({
+            htmlBody: req.params.html,
+            headerText: req.params?.brandingHeader || '',
+            footerText: req.params?.brandingFooter || '',
+          })
+        : req.params?.html || '';
     let transporterSMTP;
     let mailgunClient;
     let mailgunDomain;
@@ -131,14 +140,17 @@ async function sendMailProvider(req) {
             to: req.params.recipient,
             subject: req.params.subject,
             text: req.params.text || 'mail',
-            html: req.params?.html ? req.params.html + reportMsg : '',
+            html: brandedHtml,
             attachments: smtpenable ? attachment : undefined,
             attachment: smtpenable ? undefined : attachment,
             bcc: req.params.bcc ? req.params.bcc : undefined,
             replyTo: replyto ? replyto : undefined,
           };
           if (smtpenable) {
-            messageParams.envelope = { from: getSmtpEnvelopeFrom(senderEmail) };
+            messageParams.envelope = {
+              from: getSmtpEnvelopeFrom(senderEmail),
+              to: req.params.recipient,
+            };
           }
           if (transporterSMTP) {
             const res = await transporterSMTP.sendMail(messageParams);
@@ -228,12 +240,15 @@ async function sendMailProvider(req) {
         to: req.params.recipient,
         subject: req.params.subject,
         text: req.params.text || 'mail',
-        html: req.params?.html ? req.params.html + reportMsg : '',
+        html: brandedHtml,
         bcc: req.params.bcc ? req.params.bcc : undefined,
         replyTo: replyto ? replyto : undefined,
       };
       if (smtpenable) {
-        messageParams.envelope = { from: getSmtpEnvelopeFrom(senderEmail) };
+        messageParams.envelope = {
+          from: getSmtpEnvelopeFrom(senderEmail),
+          to: req.params.recipient,
+        };
       }
 
       if (transporterSMTP) {

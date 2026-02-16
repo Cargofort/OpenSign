@@ -120,9 +120,6 @@ async function updateDoc(docId, url, userId, ipAddress, data, className, sign, d
 async function sendNotifyMail(doc, signUser, mailProvider, publicUrl) {
   try {
     const TenantAppName = appName;
-    const logo =
-      "<img src='https://qikinnovation.ams3.digitaloceanspaces.com/logo.png' height='50' style='padding:20px'/>";
-
     const auditTrailCount = doc?.AuditTrail?.filter(x => x.Activity === 'Signed')?.length || 0;
     const removePrefill =
       doc?.Placeholders?.length > 0 && doc?.Placeholders?.filter(x => x?.Role !== 'prefill');
@@ -138,11 +135,9 @@ async function sendNotifyMail(doc, signUser, mailProvider, publicUrl) {
       const viewDocUrl = `${publicUrl}/recipientSignPdf/${doc.objectId}`;
       const subject = `Document "${pdfName}" has been signed by ${signerName}`;
       const body =
-        "<html><head><meta http-equiv='Content-Type' content='text/html; charset=UTF-8'/></head><body><div style='background-color:#f5f5f5;padding:20px'><div style='background-color:white'>" +
-        `<div>${logo}</div><div style='padding:2px;font-family:system-ui;background-color:#47a3ad'><p style='font-size:20px;font-weight:400;color:white;padding-left:20px'>Document signed by ${signerName}</p>` +
-        `</div><div style='padding:20px;font-family:system-ui;font-size:14px'><p>Dear ${creatorName},</p><p>${pdfName} has been signed by ${signerName} "${signerEmail}" successfully</p>` +
-        `<p><a href=${viewDocUrl} target=_blank>View Document</a></p></div></div><div><p>This is an automated email from ${TenantAppName}. For any queries regarding this email, ` +
-        `please contact the sender ${creatorEmail} directly.</p></div></div></body></html>`;
+        `<p>Dear ${creatorName},</p>` +
+        `<p>${pdfName} has been signed by ${signerName} "${signerEmail}" successfully</p>` +
+        `<p><a href="${viewDocUrl}" target="_blank">View Document</a></p>`;
 
       const params = {
         extUserId: sender.objectId,
@@ -152,6 +147,9 @@ async function sendNotifyMail(doc, signUser, mailProvider, publicUrl) {
         pdfName: pdfName,
         html: body,
         mailProvider: mailProvider,
+        applyBranding: true,
+        brandingHeader: `Document signed by ${signerName}`,
+        brandingFooter: `This is an automated email from ${TenantAppName}. For any queries, please contact ${creatorEmail} directly.`,
       };
       await axios.post(serverUrl + '/functions/sendmailv3', params, { headers });
     }
@@ -167,9 +165,6 @@ async function sendCompletedMail(obj) {
   const sender = obj.doc.ExtUserPtr;
   const pdfName = doc.Name;
   const TenantAppName = appName;
-  const logo =
-    "<img src='https://qikinnovation.ams3.digitaloceanspaces.com/logo.png' height='50' style='padding:20px'/>";
-
   let signersMail;
   if (doc?.Signers?.length > 0) {
     const isOwnerExistsinSigners = doc?.Signers?.find(x => x.Email === sender.Email);
@@ -181,11 +176,7 @@ async function sendCompletedMail(obj) {
   }
   const recipient = signersMail;
   let subject = `Document "${pdfName}" has been signed by all parties`;
-  let body =
-    "<html><head><meta http-equiv='Content-Type' content='text/html; charset=UTF-8' /></head><body><div style='background-color:#f5f5f5;padding:20px'><div style='background-color:white'>" +
-    `<div>${logo}</div><div style='padding:2px;font-family:system-ui;background-color:#47a3ad'><p style='font-size:20px;font-weight:400;color:white;padding-left:20px'>Document signed successfully</p></div><div>` +
-    `<p style='padding:20px;font-family:system-ui;font-size:14px'>All parties have successfully signed the document <b>"${pdfName}"</b>. Kindly download the document from the attachment.</p>` +
-    `</div></div><div><p>This is an automated email from ${TenantAppName}. For any queries regarding this email, please contact the sender ${sender.Email} directly.</p></div></div></body></html>`;
+  let body = `<p>All parties have successfully signed the document <b>"${pdfName}"</b>. Kindly download the document from the attachment.</p>`;
 
   if (obj?.isCustomMail) {
     const tenant = sender?.TenantId;
@@ -259,6 +250,9 @@ async function sendCompletedMail(obj) {
     bcc: updatedBcc?.length > 0 ? updatedBcc : '',
     certificatePath: `./exports/signed_certificate_${doc.objectId}.pdf`,
     filename: docName,
+    applyBranding: true,
+    brandingHeader: 'Document signed successfully',
+    brandingFooter: `For any queries regarding this email, please contact the sender ${sender.Email} directly.`,
   };
   try {
     const res = await axios.post(serverUrl + '/functions/sendmailv3', params, { headers });

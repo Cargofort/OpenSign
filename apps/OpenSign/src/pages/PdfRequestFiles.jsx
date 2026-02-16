@@ -895,7 +895,10 @@ function PdfRequestFiles(
                             senderEmail,
                           html: replaceVar?.body
                             ? replaceVar?.body
-                            : mailTemplate(mailparam).body
+                            : mailTemplate(mailparam).body,
+                          applyBranding: true,
+                          brandingHeader: "Digital Signature Request",
+                          brandingFooter: `For any queries regarding this email, please contact the sender ${senderEmail} directly.`
                         };
                         await axios.post(url, params, { headers: headers });
                       } catch (error) {

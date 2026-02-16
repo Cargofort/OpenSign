@@ -2,6 +2,7 @@ import dotenv from 'dotenv';
 import { format, toZonedTime } from 'date-fns-tz';
 import getPresignedUrl, { getSignedLocalUrl } from './cloud/parsefunction/getSignedUrl.js';
 import crypto from 'node:crypto';
+import fs from 'node:fs';
 import { PDFDocument, rgb } from 'pdf-lib';
 import { parseUploadFile } from './utils/fileUtils.js';
 
@@ -10,6 +11,19 @@ dotenv.config({ quiet: true });
 export const cloudServerUrl = 'http://localhost:8080/app';
 export const serverAppId = process.env.APP_ID || 'opensign';
 export const appName = 'OpenSign™';
+export const EMAIL_BRANDING_SETTINGS_KEY = 'email_branding';
+export const EMAIL_BRANDING_CLASS_NAME = 'partners_GlobalSettings';
+const defaultEmailBrandingTemplatePath = new URL('./files/email_brand_wrapper.html', import.meta.url);
+const fallbackEmailBrandingTemplate =
+  "<html><head><meta http-equiv='Content-Type' content='text/html; charset=UTF-8' /></head><body style='margin:0;background:#f5f5f5;font-family:Arial,sans-serif'><table role='presentation' width='100%' cellpadding='0' cellspacing='0' style='background:#f5f5f5;padding:20px 0'><tr><td align='center'><table role='presentation' width='640' cellpadding='0' cellspacing='0' style='background:#ffffff;border:1px solid #e9ecf1'><tr><td style='padding:16px 20px'><img src='__LOGO_URL__' alt='__APP_NAME__' height='50' style='display:block' /></td></tr><tr><td style='background:__PRIMARY_COLOR__;padding:14px 20px;color:#ffffff;font-size:20px'>__HEADER_TEXT__</td></tr><tr><td style='padding:20px'>__EMAIL_BODY__</td></tr><tr><td style='padding:16px 20px;border-top:1px solid #e9ecf1;color:#4b5563;font-size:12px'>__FOOTER_TEXT__</td></tr></table></td></tr></table></body></html>";
+const brandingTokenRegex = /<[^>]*>/g;
+const defaultBranding = {
+  logoUrl: 'https://qikinnovation.ams3.digitaloceanspaces.com/logo.png',
+  primaryColor: '#47a3ad',
+  headerText: 'Digital Signature Request',
+  footerText: '',
+  wrapperHtml: '',
+};
 export const prefillDraftDocWidget = ['date', 'textbox', 'checkbox', 'radio button', 'image'];
 export const prefillDraftTemWidget = [
   'date',
@@ -54,6 +68,89 @@ export function replaceMailVaribles(subject, body, variables) {
   const result = { subject: replacedSubject, body: replacedBody };
   return result;
 }
+
+const normalizeColorCode = value => {
+  if (!value || typeof value !== 'string') {
+    return defaultBranding.primaryColor;
+  }
+  const candidate = value.trim();
+  const validHex = /^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/.test(candidate);
+  return validHex ? candidate : defaultBranding.primaryColor;
+};
+
+const toStringSafe = value => (typeof value === 'string' ? value.trim() : '');
+
+export const getDefaultEmailBrandingTemplate = () => {
+  try {
+    const template = fs.readFileSync(defaultEmailBrandingTemplatePath, 'utf8');
+    return template || fallbackEmailBrandingTemplate;
+  } catch (err) {
+    return fallbackEmailBrandingTemplate;
+  }
+};
+
+export const getDefaultEmailBrandingConfig = () => ({
+  ...defaultBranding,
+  footerText: `This is an automated email from ${appName}.`,
+  wrapperHtml: getDefaultEmailBrandingTemplate(),
+});
+
+export const sanitizeEmailBrandingPayload = details => {
+  const safeDetails = details && typeof details === 'object' ? details : {};
+  const fallback = getDefaultEmailBrandingConfig();
+  return {
+    logoUrl: toStringSafe(safeDetails.logoUrl) || fallback.logoUrl,
+    primaryColor: normalizeColorCode(safeDetails.primaryColor),
+    footerText: toStringSafe(safeDetails.footerText) || fallback.footerText,
+    wrapperHtml: toStringSafe(safeDetails.wrapperHtml) || fallback.wrapperHtml,
+  };
+};
+
+const normalizeEmailBody = html => {
+  if (!html || typeof html !== 'string') {
+    return '';
+  }
+  const bodyMatch = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+  return bodyMatch ? bodyMatch[1] : html;
+};
+
+const cleanPlainText = value => toStringSafe(value).replace(brandingTokenRegex, '');
+
+export const getEmailBrandingConfig = async () => {
+  const fallback = getDefaultEmailBrandingConfig();
+  try {
+    const query = new Parse.Query(EMAIL_BRANDING_CLASS_NAME);
+    query.equalTo('Key', EMAIL_BRANDING_SETTINGS_KEY);
+    const existing = await query.first({ useMasterKey: true });
+    if (!existing) {
+      return fallback;
+    }
+    const config = existing.toJSON?.() || {};
+    return sanitizeEmailBrandingPayload({
+      logoUrl: config.logoUrl,
+      primaryColor: config.primaryColor,
+      footerText: config.footerText,
+      wrapperHtml: config.wrapperHtml,
+    });
+  } catch (err) {
+    return fallback;
+  }
+};
+
+export const renderBrandedEmailHtml = async ({ htmlBody, headerText, footerText }) => {
+  const branding = await getEmailBrandingConfig();
+  const defaultFooter = `This is an automated email from ${appName}.`;
+  const resolvedHeader = cleanPlainText(headerText) || defaultBranding.headerText;
+  const resolvedFooter = cleanPlainText(footerText) || branding.footerText || defaultFooter;
+  const wrapped = branding.wrapperHtml || getDefaultEmailBrandingTemplate();
+  return wrapped
+    .replaceAll('__APP_NAME__', appName)
+    .replaceAll('__LOGO_URL__', branding.logoUrl)
+    .replaceAll('__PRIMARY_COLOR__', branding.primaryColor)
+    .replaceAll('__HEADER_TEXT__', resolvedHeader)
+    .replaceAll('__FOOTER_TEXT__', resolvedFooter)
+    .replaceAll('__EMAIL_BODY__', normalizeEmailBody(htmlBody));
+};
 
 export const saveFileUsage = async (size, fileUrl, userId) => {
   //checking server url and save file's size
@@ -295,18 +392,10 @@ export const getSecureUrl = url => {
   }
 };
 
-export const mailTemplate = param => {
-  const themeColor = '#47a3ad';
+export const mailTemplate = async param => {
   const subject = `${param.senderName} has requested you to sign "${param.title}"`;
-  const AppName = appName;
-  const logo = `<img src='https://qikinnovation.ams3.digitaloceanspaces.com/logo.png' height='50' />`;
-
-  const opurl = ` <a href='mailto:complaint@opensiglabs.com' target=_blank>here</a>`;
-
   const body =
-    "<html><head><meta http-equiv='Content-Type' content='text/html;charset=UTF-8' /></head><body><div style='background-color:#f5f5f5;padding:20px'><div style='background:white;padding-bottom:20px'><div style='padding:10px'>" +
-    logo +
-    `</div><div style='padding:2px;font-family:system-ui;background-color:${themeColor}'><p style='font-size:20px;font-weight:400;color:white;padding-left:20px'>Digital Signature Request</p></div><div><p style='padding:20px;font-size:14px;margin-bottom:10px'>` +
+    `<div><p style='font-size:14px;margin-bottom:10px'>` +
     param.senderName +
     ' has requested you to review and sign <strong>' +
     param.title +
@@ -320,11 +409,7 @@ export const mailTemplate = param => {
     param.note +
     "</td></tr><tr><td></td><td></td></tr></table></div> <div style='margin-left:70px'><a target=_blank href=" +
     param.signingUrl +
-    "><button style='padding:12px;background-color:#d46b0f;color:white;border:0px;font-weight:bold;margin-top:30px'>Sign here</button></a></div><div style='display:flex;justify-content:center;margin-top:10px'></div></div></div><div><p> This is an automated email from " +
-    AppName +
-    '. For any queries regarding this email, please contact the sender ' +
-    param.senderMail +
-    ` directly. If you think this email is inappropriate or spam, you may file a complaints with ${AppName}${opurl}.</p></div></div></body></html>`;
+    "><button style='padding:12px;background-color:#d46b0f;color:white;border:0px;font-weight:bold;margin-top:30px'>Sign here</button></a></div><div style='display:flex;justify-content:center;margin-top:10px'></div></div>";
 
   return { subject, body };
 };

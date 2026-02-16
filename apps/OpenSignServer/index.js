@@ -21,6 +21,7 @@ import {
   formatFromHeader,
   getResolvedMailSender,
   getSmtpEnvelopeFrom,
+  renderBrandedEmailHtml,
   serverAppId,
   smtpenable,
   smtpsecure,
@@ -166,14 +167,31 @@ export const config = {
               },
             },
             apiCallback: async ({ payload, locale }) => {
+              let finalPayload = { ...payload };
+              if (payload.html) {
+                finalPayload = {
+                  ...payload,
+                  html: await renderBrandedEmailHtml({
+                    htmlBody: payload.html,
+                    headerText: payload.subject || '',
+                    footerText: '',
+                  }),
+                };
+              }
               if (mailgunClient) {
-                const mailgunPayload = ApiPayloadConverter.mailgun(payload);
+                const mailgunPayload = ApiPayloadConverter.mailgun(finalPayload);
                 await mailgunClient.messages.create(mailgunDomain, mailgunPayload);
               } else if (transporterMail) {
                 const smtpPayload =
                   smtpenable && smtpEnvelopeFrom
-                    ? { ...payload, envelope: { from: smtpEnvelopeFrom } }
-                    : payload;
+                    ? {
+                        ...finalPayload,
+                        envelope: {
+                          from: smtpEnvelopeFrom,
+                          to: finalPayload.to,
+                        },
+                      }
+                    : finalPayload;
                 await transporterMail.sendMail(smtpPayload);
               }
             },

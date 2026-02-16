@@ -12,9 +12,6 @@ const headers = {
 async function sendDeclineMail(doc, publicUrl, userId, reason) {
   try {
     const TenantAppName = appName;
-    const logo =
-      "<img src='https://qikinnovation.ams3.digitaloceanspaces.com/logo.png' height='50' style='padding:20px'/>";
-    const opurl = ` <a href='mailto:complaint@opensiglabs.com' target=_blank>here</a>`;
     const removePrefill =
       doc?.Placeholders?.length > 0 && doc?.Placeholders?.filter(x => x?.Role !== 'prefill');
     const signUser =
@@ -30,13 +27,10 @@ async function sendDeclineMail(doc, publicUrl, userId, reason) {
     const viewDocUrl = `${publicUrl}/recipientSignPdf/${doc.objectId}`;
     const subject = `Document "${pdfName}" has been declined by ${signerName}`;
     const body =
-      "<html><head><meta http-equiv='Content-Type' content='text/html; charset=UTF-8'/></head><body><div style='background-color:#f5f5f5;padding:20px'><div style='background-color:white'>" +
-      `<div>${logo}</div><div style='padding:2px;font-family:system-ui;background-color:#47a3ad'><p style='font-size:20px;font-weight:400;color:white;padding-left:20px'>Document declined by ${signerName}</p>` +
-      `</div><div style='padding:20px;font-family:system-ui;font-size:14px'><p>Dear ${creatorName},</p>` +
+      `<p>Dear ${creatorName},</p>` +
       `<p>${pdfName} has been declined by ${signerName} "${signerEmail}" on ${new Date().toLocaleDateString()}.</p>` +
       `<p>Decline Reason: ${reason || 'Not specified'}</p>` +
-      `<p><a href=${viewDocUrl} target=_blank>View Document</a></p></div></div><div><p>This is an automated email from ${TenantAppName}. For any queries regarding this email, ` +
-      `please contact the sender ${creatorEmail} directly. If you think this email is inappropriate or spam, you may file a complaints with ${TenantAppName}${opurl}.</p></div></div></body></html>`;
+      `<p><a href="${viewDocUrl}" target="_blank">View Document</a></p>`;
 
     const params = {
       extUserId: sender.objectId,
@@ -45,6 +39,9 @@ async function sendDeclineMail(doc, publicUrl, userId, reason) {
       subject: subject,
       pdfName: pdfName,
       html: body,
+      applyBranding: true,
+      brandingHeader: `Document declined by ${signerName}`,
+      brandingFooter: `This is an automated email from ${TenantAppName}. For any queries, please contact ${creatorEmail} directly.`,
     };
     await axios.post(serverUrl + '/functions/sendmailv3', params, { headers });
   } catch (err) {

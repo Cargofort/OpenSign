@@ -3559,14 +3559,9 @@ export const flattenPdf = async (pdfFile) => {
 };
 
 export const mailTemplate = (param) => {
-  const appName = "OpenSign™";
-  const logo = `<div style='padding:10px'><img src='https://qikinnovation.ams3.digitaloceanspaces.com/logo.png' height='50' /></div>`;
-
   const subject = `${param.senderName} has requested you to sign "${param.title}"`;
   const body =
-    "<html><head><meta http-equiv='Content-Type' content='text/html;charset=UTF-8' /></head><body><div style='background-color:#f5f5f5;padding:20px'><div style='background:white;padding-bottom:20px'>" +
-    logo +
-    `<div style='padding:2px;font-family:system-ui;background-color:${themeColor}'><p style='font-size:20px;font-weight:400;color:white;padding-left:20px'>Digital Signature Request</p></div><div><p style='padding:20px;font-size:14px;margin-bottom:10px'>` +
+    `<div><p style='font-size:14px;margin-bottom:10px'>` +
     param.senderName +
     " has requested you to review and sign <strong>" +
     param.title +
@@ -3580,11 +3575,8 @@ export const mailTemplate = (param) => {
     param.note +
     "</td></tr><tr><td></td><td></td></tr></table></div> <div style='margin-left:70px'><a target=_blank href=" +
     param.signingUrl +
-    "><button style='padding:12px;background-color:#d46b0f;color:white;border:0px;font-weight:bold;margin-top:30px'>Sign here</button></a></div><div style='display:flex;justify-content:center;margin-top:10px'></div></div></div><div><p> This is an automated email from " +
-    appName +
-    ". For any queries regarding this email, please contact the sender " +
-    param.senderMail +
-    " directly.</p></div></div></body></html> ";
+    "><button style='padding:12px;background-color:#d46b0f;color:white;border:0px;font-weight:bold;margin-top:30px'>Sign here</button></a></div><div style='display:flex;justify-content:center;margin-top:10px'></div></div>";
+
   return { subject, body };
 };
 
@@ -4044,7 +4036,10 @@ export const sendEmailToSigners = async (
           : mailTemplate(mailparam).subject,
         replyto: senderEmail,
         from: from,
-        html: replaceVar?.body ? replaceVar?.body : mailTemplate(mailparam).body
+        html: replaceVar?.body ? replaceVar?.body : mailTemplate(mailparam).body,
+        applyBranding: true,
+        brandingHeader: "Digital Signature Request",
+        brandingFooter: `For any queries regarding this email, please contact the sender ${senderEmail} directly.`
       };
 
       sendMail = await axios.post(url, params, { headers: headers });

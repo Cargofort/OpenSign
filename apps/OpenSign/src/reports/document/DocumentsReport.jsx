@@ -682,7 +682,10 @@ const DocumentsReport = (props) => {
       from:
         doc?.SenderName ||
         doc?.ExtUserPtr?.Email,
-      html: emailEditorType === "basic" ? mail.body.basic : mail.body.advanced
+      html: emailEditorType === "basic" ? mail.body.basic : mail.body.advanced,
+      applyBranding: true,
+      brandingHeader: "Digital Signature Request",
+      brandingFooter: `For any queries regarding this email, please contact the sender ${doc?.ExtUserPtr?.Email || ""} directly.`
     };
     try {
       const res = await axios.post(url, params, { headers: headers });

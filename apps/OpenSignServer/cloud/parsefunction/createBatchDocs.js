@@ -171,13 +171,18 @@ async function sendMail(document, publicUrl) {
         localExpireDate: localExpireDate,
         signingUrl: signPdf,
       };
+      const defaultRequestTemplate = await mailTemplate(mailparam);
+      const brandingFooter = `For any queries regarding this email, please contact the sender ${senderEmail} directly.`;
       let params = {
         extUserId: document.ExtUserPtr.objectId,
         recipient: existSigner?.Email || signerMail[i].email,
-        subject: replaceVar?.subject ? replaceVar?.subject : mailTemplate(mailparam).subject,
+        subject: replaceVar?.subject ? replaceVar?.subject : defaultRequestTemplate.subject,
         from: from,
         replyto: senderEmail || '',
-        html: replaceVar?.body ? replaceVar?.body : mailTemplate(mailparam).body,
+        html: replaceVar?.body ? replaceVar?.body : defaultRequestTemplate.body,
+        applyBranding: true,
+        brandingHeader: 'Digital Signature Request',
+        brandingFooter: brandingFooter,
       };
       await axios.post(url, params, { headers: headers });
     } catch (error) {

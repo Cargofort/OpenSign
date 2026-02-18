@@ -23,6 +23,18 @@ const looksLikeHash = (v) =>
   typeof v === "string" &&
   ((v.length > 20 && !v.includes("@") && !/\s/.test(v)) || /^[a-f0-9]{32,64}$/i.test(v));
 
+const getLocalJsonSafe = (key, fallback = {}) => {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return fallback;
+    const parsed = JSON.parse(raw);
+
+    return parsed && typeof parsed === "object" ? parsed : fallback;
+  } catch {
+    return fallback;
+  }
+};
+
 function UserProfile() {
   const navigate = useNavigate();
   const { t } = useTranslation();
@@ -32,7 +44,7 @@ function UserProfile() {
   let extendUser =
     localStorage.getItem("Extand_Class") &&
     JSON.parse(localStorage.getItem("Extand_Class"));
-  const ssoUserinfo = JSON.parse(localStorage.getItem("sso_userinfo") || "{}");
+  const ssoUserinfo = getLocalJsonSafe("sso_userinfo", {});
   const [parseBaseUrl] = useState(localStorage.getItem("baseUrl"));
   const [parseAppId] = useState(localStorage.getItem("parseAppId"));
   const [editmode, setEditMode] = useState(false);
@@ -265,7 +277,7 @@ function UserProfile() {
 
   const handleCancel = () => {
     setEditMode(false);
-    SetName(extendUser?.[0]?.Name || localStorage.getItem("username"));
+    SetName(displayName);
     SetPhone(UserProfile && UserProfile.phone);
     setImage(localStorage.getItem("profileImg"));
     setCompany(extendUser && extendUser?.[0]?.Company);

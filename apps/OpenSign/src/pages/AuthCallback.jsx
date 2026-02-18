@@ -5,6 +5,7 @@ import { appInfo } from "../constant/appinfo";
 import Loader from "../primitives/Loader";
 
 const PKCE_CODE_VERIFIER_KEY = "oauth_code_verifier";
+const OAUTH_STATE_KEY = "oauth_state_nonce";
 
 export default function AuthCallback() {
   const [searchParams] = useSearchParams();
@@ -13,7 +14,7 @@ export default function AuthCallback() {
 
   useEffect(() => {
     const code = searchParams.get("code");
-    const state = searchParams.get("state");
+    const stateNonce = searchParams.get("state");
     const authError = searchParams.get("error");
 
     if (authError) {
@@ -24,6 +25,28 @@ export default function AuthCallback() {
     if (!code) {
       setError("Missing authorization code");
       return;
+    }
+
+    let redirectPath = "/";
+    let stateMap = {};
+    try {
+      stateMap = JSON.parse(sessionStorage.getItem(OAUTH_STATE_KEY) || "{}") || {};
+    } catch {
+      sessionStorage.removeItem(OAUTH_STATE_KEY);
+      setError("Invalid OAuth state");
+      return;
+    }
+
+    if (!stateNonce || typeof stateMap[stateNonce] !== "string") {
+      setError("Invalid OAuth state");
+      return;
+    }
+    redirectPath = stateMap[stateNonce];
+    delete stateMap[stateNonce];
+    if (Object.keys(stateMap).length > 0) {
+      sessionStorage.setItem(OAUTH_STATE_KEY, JSON.stringify(stateMap));
+    } else {
+      sessionStorage.removeItem(OAUTH_STATE_KEY);
     }
 
     const issuer = appInfo.oauthIssuer;
@@ -124,7 +147,7 @@ export default function AuthCallback() {
         }
 
         localStorage.setItem("appLogo", appInfo.applogo);
-        navigate(state || "/", { replace: true });
+        navigate(redirectPath || "/", { replace: true });
         window.location.reload();
       } catch (err) {
         console.error("Auth callback error:", err);

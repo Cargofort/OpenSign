@@ -19,7 +19,20 @@ function assertInternalUser(userInfo) {
     ssoAllowedGroups.includes(typeof g === 'string' ? g : String(g))
   );
   if (!hasAllowedGroup) {
-    console.warn('[ssoLogin] Group check failed. userinfo keys:', Object.keys(userInfo), '| groups claim:', ssoGroupsClaim, '| received:', userInfo[ssoGroupsClaim], '| allowed:', ssoAllowedGroups);
+    if (process.env.NODE_ENV !== 'production') {
+      console.warn(
+        '[ssoLogin] Group check failed. userinfo keys:',
+        Object.keys(userInfo),
+        '| groups claim:',
+        ssoGroupsClaim,
+        '| received:',
+        userInfo[ssoGroupsClaim],
+        '| allowed:',
+        ssoAllowedGroups
+      );
+    } else {
+      console.warn('[ssoLogin] Group check failed');
+    }
     throw new Parse.Error(
       Parse.Error.OBJECT_NOT_FOUND,
       'Only internal users are allowed to sign in. Contact your administrator.'

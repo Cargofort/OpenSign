@@ -9,7 +9,10 @@ const ssoRoleClaim = process.env.SSO_ROLE_CLAIM || 'opensign_role';
 
 /** Returns { org, tenantId, team } if any organization exists (single-org mode). Otherwise null. */
 async function getExistingOrgAndTeam() {
-  const org = await new Parse.Query('contracts_Organizations').first({ useMasterKey: true });
+  // Single-org mode expects one org; pick earliest created deterministically when multiple exist.
+  const org = await new Parse.Query('contracts_Organizations')
+    .ascending('createdAt')
+    .first({ useMasterKey: true });
   if (!org) return null;
   const tenantId = org.get('TenantId')?.id;
   if (!tenantId) return null;

@@ -168,9 +168,30 @@ function Login() {
       return;
     }
     const PKCE_CODE_VERIFIER_KEY = "oauth_code_verifier";
+    const OAUTH_STATE_KEY = "oauth_state_nonce";
     const codeVerifier = generateCodeVerifier();
     const codeChallenge = await sha256(codeVerifier);
     sessionStorage.setItem(PKCE_CODE_VERIFIER_KEY, codeVerifier);
+
+    const generateStateNonce = () => {
+      if (crypto?.randomUUID) {
+        return crypto.randomUUID();
+      }
+      const array = new Uint8Array(16);
+      crypto.getRandomValues(array);
+      return Array.from(array, (b) => b.toString(16).padStart(2, "0")).join("");
+    };
+
+    const redirectPath = location?.state?.from?.pathname || "/";
+    const stateNonce = generateStateNonce();
+    let stateMap = {};
+    try {
+      stateMap = JSON.parse(sessionStorage.getItem(OAUTH_STATE_KEY) || "{}") || {};
+    } catch {
+      stateMap = {};
+    }
+    stateMap[stateNonce] = redirectPath;
+    sessionStorage.setItem(OAUTH_STATE_KEY, JSON.stringify(stateMap));
 
     const params = new URLSearchParams({
       client_id: clientId,
@@ -179,7 +200,7 @@ function Login() {
       scope: "openid email profile",
       code_challenge: codeChallenge,
       code_challenge_method: "S256",
-      state: location?.state?.from?.pathname || "/",
+      state: stateNonce,
     });
     const authUrl = `${issuer.replace(/\/$/, "")}/authorize/?${params.toString()}`;
     window.location.href = authUrl;

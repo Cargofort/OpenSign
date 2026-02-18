@@ -1,3 +1,8 @@
+const looksLikeHash = (v) =>
+  v &&
+  typeof v === 'string' &&
+  ((v.length > 20 && !v.includes('@') && !/\s/.test(v)) || /^[a-f0-9]{32,64}$/i.test(v));
+
 async function getUserDetails(request) {
   const reqEmail = request.params.email;
   if (reqEmail || request.user) {
@@ -7,8 +12,8 @@ async function getUserDetails(request) {
       if (reqEmail) {
         userQuery.equalTo('Email', reqEmail);
       } else {
-        const email = request.user.get('email');
-        userQuery.equalTo('Email', email);
+        // Prefer lookup by UserId (works for SSO users where email may not be set on _User)
+        userQuery.equalTo('UserId', request.user);
       }
       userQuery.include('TenantId');
       userQuery.include('UserId');
@@ -24,9 +29,25 @@ async function getUserDetails(request) {
       if (res) {
         if (reqEmail) {
           return { objectId: res.id };
-        } else {
-          return res;
         }
+        const extEmail = res.get('Email') || '';
+        const extName = res.get('Name') || '';
+        if (looksLikeHash(extEmail) || looksLikeHash(extName)) {
+          const parseUser = res.get('UserId');
+          if (parseUser) {
+            const pu = await new Parse.Query(Parse.User).get(parseUser.id, { useMasterKey: true });
+            const puEmail = pu?.get('email') || '';
+            const puName = pu?.get('name') || '';
+            if (puEmail && !looksLikeHash(puEmail)) res.set('Email', puEmail);
+            if (puName && !looksLikeHash(puName)) res.set('Name', puName);
+            try {
+              await res.save(null, { useMasterKey: true });
+            } catch (e) {
+              console.warn('[getUserDetails] Could not persist profile fix:', e?.message);
+            }
+          }
+        }
+        return res;
       } else {
         return '';
       }

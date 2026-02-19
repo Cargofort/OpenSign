@@ -3,6 +3,21 @@ import { cloudServerUrl, serverAppId } from '../../Utils.js';
 const serverUrl = cloudServerUrl; //process.env.SERVER_URL;
 const APPID = serverAppId;
 const masterKEY = process.env.MASTER_KEY;
+
+/** Returns { org, tenantId, team } if any organization exists (single-org mode). Otherwise null. */
+async function getExistingOrgAndTeam() {
+  const org = await new Parse.Query('contracts_Organizations').first({ useMasterKey: true });
+  if (!org) return null;
+  const tenantId = org.get('TenantId')?.id;
+  if (!tenantId) return null;
+  const team = await new Parse.Query('contracts_Teams')
+    .equalTo('OrganizationId', { __type: 'Pointer', className: 'contracts_Organizations', objectId: org.id })
+    .equalTo('Name', 'All Users')
+    .first({ useMasterKey: true });
+  if (!team) return null;
+  return { org, tenantId, team };
+}
+
 async function addTeamAndOrg(extUser) {
   try {
     const extUserCls = new Parse.Query('contracts_Users');
@@ -110,6 +125,13 @@ export default async function AddAdmin(request) {
     const extUser = await extQuery.first({ useMasterKey: true });
     if (extUser) {
       return { message: 'User already exist' };
+    }
+
+    const existing = await getExistingOrgAndTeam();
+    let tenantRes;
+
+    if (existing) {
+      tenantRes = { id: existing.tenantId };
     } else {
       const partnerQuery = new Parse.Object('partners_Tenant');
       partnerQuery.set('UserId', {
@@ -144,9 +166,10 @@ export default async function AddAdmin(request) {
       if (userDetails && userDetails.address) {
         partnerQuery.set('Address', userDetails.address);
       }
-      const tenantRes = await partnerQuery.save(null, { useMasterKey: true });
-      // console.log("tenantRes ", tenantRes);
-      const newObj = new Parse.Object('contracts_Users');
+      tenantRes = await partnerQuery.save(null, { useMasterKey: true });
+    }
+
+    const newObj = new Parse.Object('contracts_Users');
       newObj.set('UserId', {
         __type: 'Pointer',
         className: '_User',
@@ -172,8 +195,20 @@ export default async function AddAdmin(request) {
       if (userDetails?.timezone) {
         newObj.set('Timezone', userDetails?.timezone);
       }
-      const extRes = await newObj.save(null, { useMasterKey: true });
-      const extUser = {
+    if (existing) {
+      newObj.set('OrganizationId', {
+        __type: 'Pointer',
+        className: 'contracts_Organizations',
+        objectId: existing.org.id,
+      });
+      newObj.set('TeamIds', [
+        { __type: 'Pointer', className: 'contracts_Teams', objectId: existing.team.id },
+      ]);
+    }
+    const extRes = await newObj.save(null, { useMasterKey: true });
+
+    if (!existing) {
+      const extUserData = {
         objectId: extRes.id,
         Name: userDetails.name,
         Email: userDetails.email?.toLowerCase()?.replace(/\s/g, ''),
@@ -184,10 +219,11 @@ export default async function AddAdmin(request) {
         Company: userDetails.company,
         JobTitle: userDetails.jobTitle,
       };
-      await addTeamAndOrg(extUser);
-      return { message: 'User sign up', sessionToken: user.sessionToken };
+      await addTeamAndOrg(extUserData);
     }
+    return { message: 'User sign up', sessionToken: user.sessionToken };
   } catch (err) {
     console.log('Err ', err);
+    throw err;
   }
 }

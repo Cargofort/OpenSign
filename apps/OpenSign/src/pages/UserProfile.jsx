@@ -18,6 +18,23 @@ import Loader from "../primitives/Loader";
 import { useTranslation } from "react-i18next";
 import SelectLanguage from "../components/pdf/SelectLanguage";
 
+const looksLikeHash = (v) =>
+  v &&
+  typeof v === "string" &&
+  ((v.length > 20 && !v.includes("@") && !/\s/.test(v)) || /^[a-f0-9]{32,64}$/i.test(v));
+
+const getLocalJsonSafe = (key, fallback = {}) => {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return fallback;
+    const parsed = JSON.parse(raw);
+
+    return parsed && typeof parsed === "object" ? parsed : fallback;
+  } catch {
+    return fallback;
+  }
+};
+
 function UserProfile() {
   const navigate = useNavigate();
   const { t } = useTranslation();
@@ -27,10 +44,21 @@ function UserProfile() {
   let extendUser =
     localStorage.getItem("Extand_Class") &&
     JSON.parse(localStorage.getItem("Extand_Class"));
+  const ssoUserinfo = getLocalJsonSafe("sso_userinfo", {});
   const [parseBaseUrl] = useState(localStorage.getItem("baseUrl"));
   const [parseAppId] = useState(localStorage.getItem("parseAppId"));
   const [editmode, setEditMode] = useState(false);
-  const [name, SetName] = useState(localStorage.getItem("username"));
+  const extName = extendUser?.[0]?.Name;
+  const extEmail = extendUser?.[0]?.Email;
+  const displayName =
+    !extName || looksLikeHash(extName)
+      ? ssoUserinfo?.name || UserProfile?.name || localStorage.getItem("username") || extName
+      : extName;
+  const displayEmail =
+    !extEmail || looksLikeHash(extEmail)
+      ? ssoUserinfo?.email || UserProfile?.email || extEmail
+      : extEmail;
+  const [name, SetName] = useState(displayName);
   const [Phone, SetPhone] = useState(UserProfile && UserProfile.phone);
   const [Image, setImage] = useState(localStorage.getItem("profileImg"));
   const [isLoader, setIsLoader] = useState(false);
@@ -249,7 +277,7 @@ function UserProfile() {
 
   const handleCancel = () => {
     setEditMode(false);
-    SetName(localStorage.getItem("username"));
+    SetName(displayName);
     SetPhone(UserProfile && UserProfile.phone);
     setImage(localStorage.getItem("profileImg"));
     setCompany(extendUser && extendUser?.[0]?.Company);
@@ -345,7 +373,7 @@ function UserProfile() {
                     onChange={(e) => SetName(e.target.value)}
                   />
                 ) : (
-                  <span>{localStorage.getItem("username")}</span>
+                  <span>{displayName}</span>
                 )}
               </li>
               <li
@@ -378,7 +406,7 @@ function UserProfile() {
                     />
                   )}
                 </span>
-                <span>{UserProfile && UserProfile.email}</span>
+                <span>{displayEmail || (UserProfile && UserProfile.email)}</span>
               </li>
               <li
                 className={`flex justify-between items-center border-b-[1px] border-gray-300 break-all ${

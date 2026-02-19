@@ -144,6 +144,68 @@ function Login() {
     await handleLogin();
   };
 
+  const generateCodeVerifier = () => {
+    const array = new Uint8Array(32);
+    crypto.getRandomValues(array);
+    return Array.from(array, (b) => b.toString(16).padStart(2, "0")).join("");
+  };
+
+  const sha256 = async (plain) => {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(plain);
+    const hash = await crypto.subtle.digest("SHA-256", data);
+    return btoa(String.fromCharCode(...new Uint8Array(hash)))
+      .replace(/\+/g, "-")
+      .replace(/\//g, "_")
+      .replace(/=+$/, "");
+  };
+
+  const handleSsoLogin = async () => {
+    const issuer = appInfo.oauthIssuer;
+    const clientId = appInfo.oauthClientId;
+    if (!issuer || !clientId) {
+      showToast("danger", "SSO is not configured.");
+      return;
+    }
+    const PKCE_CODE_VERIFIER_KEY = "oauth_code_verifier";
+    const OAUTH_STATE_KEY = "oauth_state_nonce";
+    const codeVerifier = generateCodeVerifier();
+    const codeChallenge = await sha256(codeVerifier);
+    sessionStorage.setItem(PKCE_CODE_VERIFIER_KEY, codeVerifier);
+
+    const generateStateNonce = () => {
+      if (crypto?.randomUUID) {
+        return crypto.randomUUID();
+      }
+      const array = new Uint8Array(16);
+      crypto.getRandomValues(array);
+      return Array.from(array, (b) => b.toString(16).padStart(2, "0")).join("");
+    };
+
+    const redirectPath = location?.state?.from?.pathname || "/";
+    const stateNonce = generateStateNonce();
+    let stateMap = {};
+    try {
+      stateMap = JSON.parse(sessionStorage.getItem(OAUTH_STATE_KEY) || "{}") || {};
+    } catch {
+      stateMap = {};
+    }
+    stateMap[stateNonce] = redirectPath;
+    sessionStorage.setItem(OAUTH_STATE_KEY, JSON.stringify(stateMap));
+
+    const params = new URLSearchParams({
+      client_id: clientId,
+      redirect_uri: `${window.location.origin}/auth/callback`,
+      response_type: "code",
+      scope: "openid email profile",
+      code_challenge: codeChallenge,
+      code_challenge_method: "S256",
+      state: stateNonce,
+    });
+    const authUrl = `${issuer.replace(/\/$/, "")}/authorize/?${params.toString()}`;
+    window.location.href = authUrl;
+  };
+
   const setThirdpartyLoader = (value) => {
     setState({ ...state, thirdpartyLoader: value });
   };
@@ -183,6 +245,9 @@ function Login() {
               localStorage.setItem("Extand_Class", JSON.stringify([extUser]));
               localStorage.setItem("userEmail", extInfo?.Email);
               localStorage.setItem("username", extInfo?.Name);
+              const merged = { ..._user, email: extInfo?.Email || _user.email, name: extInfo?.Name || _user.name };
+              localStorage.setItem("UserInformation", JSON.stringify(merged));
+              localStorage.removeItem("sso_userinfo");
               if (extInfo?.TenantId) {
                 const tenant = {
                   Id: extInfo?.TenantId?.objectId || "",
@@ -243,6 +308,9 @@ function Login() {
             localStorage.setItem("Extand_Class", JSON.stringify([extUser]));
             localStorage.setItem("userEmail", extInfo.Email);
             localStorage.setItem("username", extInfo.Name);
+            const merged = { ..._user, email: extInfo?.Email || _user.email, name: extInfo?.Name || _user.name };
+            localStorage.setItem("UserInformation", JSON.stringify(merged));
+            localStorage.removeItem("sso_userinfo");
             if (extInfo?.TenantId) {
               const tenant = {
                 Id: extInfo?.TenantId?.objectId || "",
@@ -265,8 +333,13 @@ function Login() {
           logOutUser();
         }
       } else {
-        showToast("danger", t("user-not-found"));
-        logOutUser();
+        if (_user?.authData?.sso) {
+          setState({ ...state, loading: false });
+          setIsModal(true);
+        } else {
+          showToast("danger", t("user-not-found"));
+          logOutUser();
+        }
       }
     } catch (error) {
       showToast("danger", t("something-went-wrong-mssg"));
@@ -283,35 +356,49 @@ function Login() {
     if (userDetails.Destination && userDetails.Company) {
       setThirdpartyLoader(true);
       const payload = { sessionToken: localStorage.getItem("accesstoken") };
+      const ssoUserinfo = JSON.parse(localStorage.getItem("sso_userinfo") || "{}");
       const userInformation = JSON.parse(
-        localStorage.getItem("UserInformation")
+        localStorage.getItem("UserInformation") || "{}"
       );
-      if (payload && payload.sessionToken) {
-        const params = {
-          userDetails: {
-            name: userInformation.name,
-            email: userInformation.email,
-            phone: userInformation?.phone || "",
-            role: "contracts_User",
-            company: userDetails.Company,
-            jobTitle: userDetails.Destination,
-            timezone: usertimezone
-          }
-        };
-        const userSignUp = await Parse.Cloud.run("usersignup", params);
-        if (userSignUp && userSignUp.sessionToken) {
-          const LocalUserDetails = {
-            name: userInformation.name,
-            email: userInformation.email,
-            phone: userInformation?.phone || "",
-            company: userDetails.Company,
-            jobTitle: userDetails.JobTitle
+      const email = ssoUserinfo.email || userInformation.email || userInformation.username || localStorage.getItem("userEmail") || "";
+      const name = ssoUserinfo.name || userInformation.name || userInformation.username || email;
+      if (payload && payload.sessionToken && email) {
+        try {
+          const params = {
+            userDetails: {
+              name,
+              email,
+              phone: userInformation?.phone || "",
+              role: "contracts_User",
+              company: userDetails.Company,
+              jobTitle: userDetails.Destination,
+              timezone: usertimezone
+            },
+            isSsoSignup: true
           };
-          localStorage.setItem("userDetails", JSON.stringify(LocalUserDetails));
-          thirdpartyLoginfn(userSignUp.sessionToken);
-        } else {
-          alert(userSignUp.message);
+          const userSignUp = await Parse.Cloud.run("usersignup", params);
+          if (userSignUp && userSignUp.sessionToken) {
+            const LocalUserDetails = {
+              name,
+              email,
+              phone: userInformation?.phone || "",
+              company: userDetails.Company,
+              jobTitle: userDetails.Destination
+            };
+            localStorage.setItem("userDetails", JSON.stringify(LocalUserDetails));
+            localStorage.removeItem("sso_userinfo");
+            await thirdpartyLoginfn(userSignUp.sessionToken);
+          } else {
+            showToast("danger", userSignUp?.message || t("something-went-wrong-mssg"));
+          }
+        } catch (err) {
+          console.error("SSO signup error:", err);
+          showToast("danger", err?.message || t("something-went-wrong-mssg"));
+        } finally {
+          setThirdpartyLoader(false);
         }
+      } else if (!email) {
+        showToast("danger", t("user-not-found"));
       } else if (
         payload &&
         payload.message.replace(/ /g, "_") === "Internal_server_err"
@@ -516,6 +603,16 @@ function Login() {
                       >
                         {state.loading ? t("loading") : t("login")}
                       </button>
+                      {appInfo.oauthIssuer && appInfo.oauthClientId && (
+                        <button
+                          type="button"
+                          className="op-btn op-btn-outline"
+                          onClick={handleSsoLogin}
+                          disabled={state.loading || state.thirdpartyLoader}
+                        >
+                          {t("sign-SSO")}
+                        </button>
+                      )}
                     </div>
                   </form>
                 </div>

@@ -19,6 +19,8 @@ export const appInfo = {
   googleClietId: process.env.REACT_APP_GOOGLECLIENTID
     ? `${process.env.REACT_APP_GOOGLECLIENTID}`
     : "",
+  oauthIssuer: (getEnv()?.REACT_APP_OAUTH_ISSUER || process.env.REACT_APP_OAUTH_ISSUER) || "",
+  oauthClientId: (getEnv()?.REACT_APP_OAUTH_CLIENT_ID || process.env.REACT_APP_OAUTH_CLIENT_ID) || "",
   metaDescription:
     "The fastest way to sign PDFs & request signatures from others.",
   settings: [

@@ -22,7 +22,30 @@ export default async function saveFile(request) {
         let file;
         if (ext === 'pdf') {
           mimeType = 'application/pdf';
-          const flatPdf = await flattenPdf(fileBase64);
+          // Be tolerant of different base64 formats:
+          // - raw base64
+          // - data URI prefix (data:application/pdf;base64,...)
+          // - whitespace/newlines in the base64 string
+          // - URL-safe base64 (-/_)
+          let cleaned = fileBase64;
+          if (typeof cleaned === 'string') {
+            cleaned = cleaned.trim();
+            if (cleaned.startsWith('data:')) {
+              const commaIdx = cleaned.indexOf(',');
+              if (commaIdx >= 0) cleaned = cleaned.slice(commaIdx + 1);
+            }
+            cleaned = cleaned.replace(/\s/g, '');
+            // URL-safe base64 -> standard base64
+            cleaned = cleaned.replace(/-/g, '+').replace(/_/g, '/');
+            // Pad to length % 4 === 0
+            const padLen = cleaned.length % 4;
+            if (padLen) cleaned = cleaned + '='.repeat(4 - padLen);
+          }
+
+          // Decode to bytes before passing into pdf-lib.
+          const pdfBytes =
+            typeof cleaned === 'string' ? Buffer.from(cleaned, 'base64') : cleaned;
+          const flatPdf = await flattenPdf(pdfBytes);
           // file = [...flatPdf];
           file = flatPdf;
         } else if (ext === 'png' || ext === 'jpeg' || ext === 'jpg') {
@@ -38,8 +61,8 @@ export default async function saveFile(request) {
         // return { url: fileRes.url };
         try {
           const fileRes = await parseUploadFile(fileName, file, mimeType);
-          fileUrl = getSecureUrl(fileRes?.url)?.url;
-          return { url: fileUrl };
+          const fileUrl = getSecureUrl(fileRes?.url)?.url;
+          return { url: fileUrl || '' };
         } catch (err) {
           throw new Parse.Error(400, err?.message);
         }

@@ -53,9 +53,9 @@ function formatAxiosError(err) {
 }
 
 async function introspectAuthentikToken(accessToken) {
-  const introspectionUrl = requireEnv('AUTHENTIK_INTROSPECTION_URL');
-  const clientId = requireEnv('AUTHENTIK_CLIENT_ID');
-  const clientSecret = requireEnv('AUTHENTIK_CLIENT_SECRET');
+  const introspectionUrl = requireEnv('OAUTH_INTROSPECTION_URL');
+  const clientId = requireEnv('OAUTH_CLIENT_ID');
+  const clientSecret = requireEnv('OAUTH_CLIENT_SECRET');
 
   try {
     const body = new URLSearchParams({ token: accessToken }).toString();

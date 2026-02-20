@@ -15,10 +15,10 @@ In production, it will look like:
 ## Auth
 
 The endpoint requires:
-- `Authorization: Bearer <Authentik access token>` (client credentials flow)
+- `Authorization: Bearer <oauth access token>` (client credentials flow)
 - `X-Parse-Application-Id: <APP_ID>` (Parse header; not a secret)
 
-Server validates the Bearer token via Authentik introspection (`AUTHENTIK_INTROSPECTION_URL`).
+Server validates the Bearer token via oauth provider introspection (`OAUTH_INTROSPECTION_URL`).
 
 ## Get an access token (client_credentials)
 

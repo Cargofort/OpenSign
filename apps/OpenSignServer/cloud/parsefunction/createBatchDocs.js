@@ -117,6 +117,10 @@ async function sendMail(document, publicUrl) {
     signerMail = signerMail.slice();
     signerMail.splice(1);
   }
+  const signerObjIds = signerMail
+    .map(item => item?.signerObjId || '')
+    .filter(Boolean);
+  const uniqueSignerObjIds = new Set(signerObjIds);
   for (let i = 0; i < signerMail.length; i++) {
     try {
       let url = `${serverUrl}/functions/sendmailv3`;
@@ -195,150 +199,126 @@ async function startBulkSendInBackground(userId, Documents, Ip, parseConfig, typ
   const extCls = new Parse.Query('contracts_Users');
   extCls.equalTo('UserId', { __type: 'Pointer', className: '_User', objectId: userId });
   const resExt = await extCls.first({ useMasterKey: true });
-  if (!resExt) throw new Parse.Error(Parse.Error.OBJECT_NOT_FOUND, 'User not found.');
-
-  const _resExt = JSON.parse(JSON.stringify(resExt));
-
-  // Build Parse /batch requests from your existing mapping (same as your current code)
-  const requests = Documents.map(x => {
-    const Signers = x.Signers;
-    const placeholders = x?.Placeholders?.filter(p => p?.Role !== 'prefill');
-    const allSigner = placeholders
-      ?.map(
-        item => Signers?.find(e => item?.signerPtr?.objectId === e?.objectId) || item?.signerPtr
-      )
-      .filter(signer => signer && Object.keys(signer).length > 0);
-    const date = new Date();
-    const isoDate = date.toISOString();
-    let Acl = { [x.CreatedBy.objectId]: { read: true, write: true } };
-    if (allSigner && allSigner.length > 0) {
-      allSigner.forEach(x => {
-        if (x?.CreatedBy?.objectId) {
-          Acl = { ...Acl, [x.CreatedBy.objectId]: { read: true, write: true } };
-        }
-      });
-    }
-    let mailBody = x?.ExtUserPtr?.TenantId?.RequestBody || '';
-    let mailSubject = x?.ExtUserPtr?.TenantId?.RequestSubject || '';
-    return {
-      method: 'POST',
-      path: '/app/classes/contracts_Document',
-      body: {
-        Name: x.Name,
-        URL: x.URL,
-        Note: x.Note,
-        Description: x.Description,
-        CreatedBy: x.CreatedBy,
-        SendinOrder: x.SendinOrder || true,
-        ExtUserPtr: {
-          __type: 'Pointer',
-          className: x.ExtUserPtr.className,
-          objectId: x.ExtUserPtr?.objectId,
-        },
-        Placeholders: placeholders.map(y =>
-          y?.signerPtr?.objectId
-            ? {
-                ...y,
-                signerPtr: {
-                  __type: 'Pointer',
-                  className: 'contracts_Contactbook',
-                  objectId: y.signerPtr.objectId,
-                },
-                signerObjId: y.signerObjId,
-                email: y?.signerPtr?.Email || y?.email || '',
-              }
-            : { ...y, signerPtr: {}, signerObjId: '', email: y.email || '' }
-        ),
-        SignedUrl: x.URL || x.SignedUrl,
-        SentToOthers: true,
-        Signers: allSigner?.map(y => ({
-          __type: 'Pointer',
-          className: 'contracts_Contactbook',
-          objectId: y.objectId,
-        })),
-        ACL: Acl,
-        SentToOthers: true,
-        RemindOnceInEvery: x.RemindOnceInEvery ? parseInt(x.RemindOnceInEvery) : 5,
-        AutomaticReminders: x.AutomaticReminders || false,
-        TimeToCompleteDays: x.TimeToCompleteDays ? parseInt(x.TimeToCompleteDays) : 15,
-        OriginIp: Ip,
-        DocSentAt: { __type: 'Date', iso: isoDate },
-        IsEnableOTP: x?.IsEnableOTP || false,
-        IsTourEnabled: x?.IsTourEnabled || false,
-        AllowModifications: x?.AllowModifications || false,
-        ...(x?.SignatureType ? { SignatureType: x?.SignatureType } : {}),
-        ...(x?.NotifyOnSignatures ? { NotifyOnSignatures: x?.NotifyOnSignatures } : {}),
-        ...(x?.Bcc?.length > 0 ? { Bcc: x?.Bcc } : {}),
-        ...(x?.RedirectUrl ? { RedirectUrl: x?.RedirectUrl } : {}),
-        ...(mailBody ? { RequestBody: mailBody } : {}),
-        ...(mailSubject ? { RequestSubject: mailSubject } : {}),
-        ...(x?.objectId
-          ? {
-              TemplateId: {
-                __type: 'Pointer',
-                className: 'contracts_Template',
-                objectId: x?.objectId,
-              },
+  if (resExt) {
+    const _resExt = JSON.parse(JSON.stringify(resExt));
+    try {
+      const requests = Documents.map(x => {
+        const Signers = x.Signers;
+        const placeholders = x?.Placeholders?.filter(p => p?.Role !== 'prefill');
+        const normalizedSendInOrder =
+          typeof x?.SendinOrder === 'boolean' ? x.SendinOrder : true;
+        const allSigner = placeholders
+          ?.map(
+            item => Signers?.find(e => item?.signerPtr?.objectId === e?.objectId) || item?.signerPtr
+          )
+          .filter(signer => Object.keys(signer).length > 0);
+        const date = new Date();
+        const isoDate = date.toISOString();
+        let Acl = { [x.CreatedBy.objectId]: { read: true, write: true } };
+        if (allSigner && allSigner.length > 0) {
+          allSigner.forEach(x => {
+            if (x?.CreatedBy?.objectId) {
+              const obj = { [x.CreatedBy.objectId]: { read: true, write: true } };
+              Acl = { ...Acl, ...obj };
             }
-          : {}),
-        ...(x?.PenColors?.length > 0 ? { PenColors: x?.PenColors } : {}),
-      },
-    };
-  });
-
-  if (requests?.length > 0) {
-    const newrequests = [requests?.[0]];
-    const response = await axios.post('batch', { requests: newrequests }, parseConfig);
-    // Handle the batch query response
-    // console.log('Batch query response:', response.data);
-    if (response.data && response.data.length > 0) {
-      const document = Documents?.[0];
-      const updateDocuments = {
-        ...document,
-        objectId: response.data[0]?.success?.objectId,
-        createdAt: response.data[0]?.success?.createdAt,
-      };
-      deductcount(response.data.length, resExt.id);
-      sendMail(updateDocuments, publicUrl); //sessionToken
-      return { total: 1, created: 1, failed: 0 };
+          });
+        }
+        let mailBody = x?.ExtUserPtr?.TenantId?.RequestBody || '';
+        let mailSubject = x?.ExtUserPtr?.TenantId?.RequestSubject || '';
+        return {
+          method: 'POST',
+          path: '/app/classes/contracts_Document',
+          body: {
+            Name: x.Name,
+            URL: x.URL,
+            Note: x.Note,
+            Description: x.Description,
+            CreatedBy: x.CreatedBy,
+            SendinOrder: normalizedSendInOrder,
+            ExtUserPtr: {
+              __type: 'Pointer',
+              className: x.ExtUserPtr.className,
+              objectId: x.ExtUserPtr?.objectId,
+            },
+            Placeholders: placeholders.map(y =>
+              y?.signerPtr?.objectId
+                ? {
+                    ...y,
+                    signerPtr: {
+                      __type: 'Pointer',
+                      className: 'contracts_Contactbook',
+                      objectId: y.signerPtr.objectId,
+                    },
+                    signerObjId: y.signerObjId,
+                    email: y?.signerPtr?.Email || y?.email || '',
+                  }
+                : { ...y, signerPtr: {}, signerObjId: '', email: y.email || '' }
+            ),
+            SignedUrl: x.URL || x.SignedUrl,
+            SentToOthers: true,
+            Signers: allSigner?.map(y => ({
+              __type: 'Pointer',
+              className: 'contracts_Contactbook',
+              objectId: y.objectId,
+            })),
+            ACL: Acl,
+            SentToOthers: true,
+            RemindOnceInEvery: x.RemindOnceInEvery ? parseInt(x.RemindOnceInEvery) : 5,
+            AutomaticReminders: x.AutomaticReminders || false,
+            TimeToCompleteDays: x.TimeToCompleteDays ? parseInt(x.TimeToCompleteDays) : 15,
+            OriginIp: Ip,
+            DocSentAt: { __type: 'Date', iso: isoDate },
+            IsEnableOTP: x?.IsEnableOTP || false,
+            IsTourEnabled: x?.IsTourEnabled || false,
+            AllowModifications: x?.AllowModifications || false,
+            ...(x?.SignatureType ? { SignatureType: x?.SignatureType } : {}),
+            ...(x?.NotifyOnSignatures ? { NotifyOnSignatures: x?.NotifyOnSignatures } : {}),
+            ...(x?.Bcc?.length > 0 ? { Bcc: x?.Bcc } : {}),
+            ...(x?.RedirectUrl ? { RedirectUrl: x?.RedirectUrl } : {}),
+            ...(mailBody ? { RequestBody: mailBody } : {}),
+            ...(mailSubject ? { RequestSubject: mailSubject } : {}),
+            ...(x?.objectId
+              ? {
+                  TemplateId: {
+                    __type: 'Pointer',
+                    className: 'contracts_Template',
+                    objectId: x?.objectId,
+                  },
+                }
+              : {}),
+            ...(x?.PenColors?.length > 0 ? { PenColors: x?.PenColors } : {}),
+          },
+        };
+      });
+      if (requests?.length > 0) {
+        const newrequests = [requests?.[0]];
+        const response = await axios.post('batch', { requests: newrequests }, parseConfig);
+        // Handle the batch query response
+        // console.log('Batch query response:', response.data);
+        if (response.data && response.data.length > 0) {
+          const document = Documents?.[0];
+          const updateDocuments = {
+            ...document,
+            objectId: response.data[0]?.success?.objectId,
+            createdAt: response.data[0]?.success?.createdAt,
+          };
+          deductcount(response.data.length, resExt.id);
+          sendMail(updateDocuments, publicUrl); //sessionToken
+          return {
+            documentId: response.data[0]?.success?.objectId || '',
+            createdAt: response.data[0]?.success?.createdAt || '',
+          };
+        }
+      }
+    } catch (error) {
+      const code = error?.response?.data?.code || error?.response?.status || error?.code || 400;
+      const msg =
+        error?.response?.data?.error ||
+        error?.response?.data ||
+        error?.message ||
+        'Something went wrong.';
+      console.log('Error performing batch query:', code, msg);
+      throw new Parse.Error(code, msg);
     }
-  }
-}
-
-export default async function createBatchDocs(request) {
-  const strDocuments = request.params.Documents;
-  const sessionToken = request.headers?.sessiontoken;
-  const type = request.headers?.type || 'quicksend';
-  const Documents = JSON.parse(strDocuments);
-
-  const Ip = request?.headers?.['x-real-ip'] || '';
-  // Access the host from the headers
-  const publicUrl = request.headers.public_url;
-  const parseConfig = {
-    baseURL: serverUrl,
-    headers: {
-      'X-Parse-Application-Id': appId,
-      'X-Parse-Session-Token': sessionToken,
-      'Content-Type': 'application/json',
-    },
-  };
-  try {
-    let userId = '';
-
-    if (request?.user) {
-      userId = request.user.id;
-      // return await batchQuery(request.user.id, Documents, Ip, parseConfig, type, publicUrl);
-    }
-    if (!userId) {
-      throw new Parse.Error(Parse.Error.INVALID_SESSION_TOKEN, 'User is not authenticated.');
-    }
-
-    // quicksend
-    return await startBulkSendInBackground(userId, Documents, Ip, parseConfig, type, publicUrl);
-  } catch (err) {
-    console.log('createbatchdoc error: ', err);
-    const code = err?.code || 400;
-    const msg = err?.message || 'Something went wrong.';
-    throw new Parse.Error(code, msg);
   }
 }

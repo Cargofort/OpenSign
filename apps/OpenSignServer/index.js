@@ -216,8 +216,13 @@ app.use(express.json({ limit: '100mb' }));
 app.use(express.urlencoded({ limit: '100mb', extended: true }));
 app.use(function (req, res, next) {
   req.headers['x-real-ip'] = getUserIP(req);
-  const publicUrl = 'https://' + req?.get('host');
-  req.headers['public_url'] = publicUrl;
+  const configuredPublicUrl = process.env.PUBLIC_URL;
+  if (configuredPublicUrl && typeof configuredPublicUrl === 'string' && configuredPublicUrl.trim()) {
+    req.headers['public_url'] = configuredPublicUrl.trim().replace(/\/$/, '');
+  } else {
+    const proto = req?.headers?.['x-forwarded-proto'] || req?.protocol || 'https';
+    req.headers['public_url'] = `${proto}://${req?.get('host')}`;
+  }
   next();
 });
 function getUserIP(request) {

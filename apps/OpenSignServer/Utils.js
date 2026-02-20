@@ -8,7 +8,30 @@ import { parseUploadFile } from './utils/fileUtils.js';
 
 dotenv.config({ quiet: true });
 
-export const cloudServerUrl = 'http://localhost:8080/app';
+// Used by server-side code to call Parse endpoints (loginAs, /functions/*, /batch).
+// Defaulting to localhost:8080 keeps this working inside Docker containers, even when
+// `SERVER_URL` is configured to a public reverse-proxied URL like `https://localhost:3001/api/app`.
+export const cloudServerUrl = (() => {
+  const explicit = process.env.INTERNAL_SERVER_URL || process.env.CLOUD_SERVER_URL;
+  if (explicit && typeof explicit === 'string' && explicit.trim()) {
+    return explicit.trim().replace(/\/$/, '');
+  }
+  const env = process.env.SERVER_URL;
+  if (env && typeof env === 'string' && env.trim()) {
+    // Only use SERVER_URL for internal calls when it already points directly to the Parse mount
+    // (i.e. ends with `/app` and is not the `/api/app` reverse-proxy path).
+    try {
+      const u = new URL(env.trim());
+      const path = (u.pathname || '').replace(/\/+$/, '');
+      if (path.endsWith('/app') && !path.endsWith('/api/app')) {
+        return env.trim().replace(/\/$/, '');
+      }
+    } catch {
+      // ignore invalid URL
+    }
+  }
+  return 'http://localhost:8080/app';
+})();
 export const serverAppId = process.env.APP_ID || 'opensign';
 export const appName = 'OpenSign™';
 export const EMAIL_BRANDING_SETTINGS_KEY = 'email_branding';

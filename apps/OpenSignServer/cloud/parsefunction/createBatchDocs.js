@@ -33,6 +33,10 @@ async function sendMail(document, publicUrl) {
     signerMail = signerMail.slice();
     signerMail.splice(1);
   }
+  const signerObjIds = signerMail
+    .map(item => item?.signerObjId || '')
+    .filter(Boolean);
+  const uniqueSignerObjIds = new Set(signerObjIds);
   for (let i = 0; i < signerMail.length; i++) {
     try {
       let url = `${serverUrl}/functions/sendmailv3`;
@@ -115,6 +119,8 @@ async function batchQuery(userId, Documents, Ip, parseConfig, type, publicUrl) {
       const requests = Documents.map(x => {
         const Signers = x.Signers;
         const placeholders = x?.Placeholders?.filter(p => p?.Role !== 'prefill');
+        const normalizedSendInOrder =
+          typeof x?.SendinOrder === 'boolean' ? x.SendinOrder : true;
         const allSigner = placeholders
           ?.map(
             item => Signers?.find(e => item?.signerPtr?.objectId === e?.objectId) || item?.signerPtr
@@ -142,7 +148,7 @@ async function batchQuery(userId, Documents, Ip, parseConfig, type, publicUrl) {
             Note: x.Note,
             Description: x.Description,
             CreatedBy: x.CreatedBy,
-            SendinOrder: x.SendinOrder || true,
+            SendinOrder: normalizedSendInOrder,
             ExtUserPtr: {
               __type: 'Pointer',
               className: x.ExtUserPtr.className,
@@ -212,7 +218,10 @@ async function batchQuery(userId, Documents, Ip, parseConfig, type, publicUrl) {
           };
           deductcount(response.data.length, resExt.id);
           sendMail(updateDocuments, publicUrl); //sessionToken
-          return 'success';
+          return {
+            documentId: response.data[0]?.success?.objectId || '',
+            createdAt: response.data[0]?.success?.createdAt || '',
+          };
         }
       }
     } catch (error) {

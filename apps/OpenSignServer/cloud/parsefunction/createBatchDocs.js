@@ -322,3 +322,40 @@ async function startBulkSendInBackground(userId, Documents, Ip, parseConfig, typ
     }
   }
 }
+
+export default async function createBatchDocs(request) {
+  if (!request?.user) {
+    throw new Parse.Error(Parse.Error.INVALID_SESSION_TOKEN, 'User is not authenticated.');
+  }
+  if (!request.params?.Documents) {
+    throw new Parse.Error(Parse.Error.INVALID_QUERY, 'Please provide Documents parameter.');
+  }
+  let Documents;
+  try {
+    Documents = JSON.parse(request.params.Documents);
+  } catch (e) {
+    throw new Parse.Error(Parse.Error.INVALID_QUERY, 'Documents must be valid JSON.');
+  }
+  if (!Array.isArray(Documents) || Documents.length === 0) {
+    throw new Parse.Error(Parse.Error.INVALID_QUERY, 'Documents must be a non-empty array.');
+  }
+  const publicUrl = process.env.PUBLIC_URL || process.env.SERVER_URL || 'https://localhost:3001';
+  const ip = request.headers['x-forwarded-for'] || request.headers['x-real-ip'] || request.ip || '';
+  const parseConfig = {
+    baseURL: cloudServerUrl,
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Parse-Application-Id': serverAppId,
+      'X-Parse-Session-Token': request.user.getSessionToken(),
+    },
+  };
+  const result = await startBulkSendInBackground(
+    request.user.id,
+    Documents,
+    ip,
+    parseConfig,
+    'bulksend',
+    publicUrl
+  );
+  return result;
+}

@@ -25,3 +25,8 @@ yarn-error.log*
 apps/OpenSign/public/mfbuild/*
 microfrontends/SignDocuments/build/*
 apps/OpenSignServer/files/files/*
+
+
+docker-compose.swarm*.yml
+.env.empty
+.env.swarm

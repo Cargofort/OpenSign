@@ -49,13 +49,6 @@ export default function AuthCallback() {
       sessionStorage.removeItem(OAUTH_STATE_KEY);
     }
 
-    const issuer = appInfo.oauthIssuer;
-    const clientId = appInfo.oauthClientId;
-    if (!issuer || !clientId) {
-      setError("OAuth is not configured");
-      return;
-    }
-
     const codeVerifier = sessionStorage.getItem(PKCE_CODE_VERIFIER_KEY);
     sessionStorage.removeItem(PKCE_CODE_VERIFIER_KEY);
     if (!codeVerifier) {
@@ -64,42 +57,23 @@ export default function AuthCallback() {
     }
 
     const redirectUri = `${window.location.origin}/auth/callback`;
-    const tokenUrl = `${issuer.replace(/\/$/, "")}/token/`;
-    const userinfoUrl = `${issuer.replace(/\/$/, "")}/userinfo/`;
 
     (async () => {
       try {
-        const body = new URLSearchParams({
-          grant_type: "authorization_code",
-          code,
-          redirect_uri: redirectUri,
-          client_id: clientId,
-          code_verifier: codeVerifier,
-        });
-
-        const tokenRes = await fetch(tokenUrl, {
+        const exchangeRes = await fetch("/api/auth/token-exchange", {
           method: "POST",
-          headers: { "Content-Type": "application/x-www-form-urlencoded" },
-          body: body.toString(),
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ code, code_verifier: codeVerifier, redirect_uri: redirectUri }),
         });
 
-        if (!tokenRes.ok) {
-          const errData = await tokenRes.json().catch(() => ({}));
+        if (!exchangeRes.ok) {
+          const errData = await exchangeRes.json().catch(() => ({}));
           throw new Error(
-            errData.error_description || errData.error || `Token error: ${tokenRes.status}`
+            errData.error_description || errData.error || `Token exchange error: ${exchangeRes.status}`
           );
         }
 
-        const tokenData = await tokenRes.json();
-        const accessToken = tokenData.access_token;
-
-        const userinfoRes = await fetch(userinfoUrl, {
-          headers: { Authorization: `Bearer ${accessToken}` },
-        });
-        if (!userinfoRes.ok) {
-          throw new Error("Failed to fetch user info");
-        }
-        const userInfo = await userinfoRes.json();
+        const { access_token: accessToken, userinfo: userInfo } = await exchangeRes.json();
         if (!userInfo.email || typeof userInfo.email !== "string" || !userInfo.email.includes("@")) {
           throw new Error("Email not found in user info. Ensure your Authentik provider includes the email claim.");
         }

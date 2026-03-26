@@ -52,6 +52,7 @@ curl -sS -X POST "BASE_URL/api/app/functions/sdkSignRequests" \
     "title": "Vacation Request - Example",
     "description": "Please sign your vacation request.",
     "send_in_order": true,
+    "callback_url": "https://your-system.example.com/webhooks/opensign",
     "pdf_base64": "PDF_BASE64",
     "signers": [
       {
@@ -77,6 +78,16 @@ Expected response:
 }
 ```
 
+## Per-document callback (`callback_url`)
+
+The optional `callback_url` field registers a per-document webhook URL. When set, the server POSTs signing events to that URL in addition to any globally configured `WEBHOOK_URL`.
+
+- Must be an `https://` URL, max 2048 characters.
+- Fires `document.signed` immediately when each signer completes, and `document.completed` once all signers are done.
+- Payload shape is identical to the global webhook.
+- If `WEBHOOK_SECRET` is configured on the server, each POST is HMAC-SHA256 signed via the `x-webhook-signature` header (same as the global webhook). Otherwise the request is sent unsigned.
+- Fire-and-forget: errors are logged server-side but never interrupt the signing flow.
+
 ## Notes / limits (v1)
 
 - `position_type` supports only `signature`.
@@ -87,6 +98,7 @@ Expected response:
   - positions per signer max: 50
   - total positions max: 400
   - `pdf_base64` max length: 28 MiB (base64 text length)
+  - `callback_url` max length: 2048 characters
 - `documentUrl` is built from backend `PUBLIC_URL` config; otherwise it is an empty string.
 - Signature/login links in outgoing emails also use backend `PUBLIC_URL`.
 

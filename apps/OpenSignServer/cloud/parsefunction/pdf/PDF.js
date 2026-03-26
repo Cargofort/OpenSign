@@ -513,7 +513,7 @@ async function PDF(req) {
             signed: signedAuditEntries.length,
             total: totalSigners,
           },
-        });
+        }, _resDoc.CallbackUrl || null);
         saveFileUsage(pdfSize, data.imageUrl, _resDoc?.CreatedBy?.objectId);
         if (updatedDoc && updatedDoc.isCompleted) {
           const hashForDoc = documentHash || updatedDoc?.DocumentHash;
@@ -536,7 +536,7 @@ async function PDF(req) {
                   _resDoc.Signers,
                   _resDoc.ExtUserPtr
                 ),
-              });
+              }, _resDoc.CallbackUrl || null);
             })
             .catch(err => {
               console.error('[Webhook] Failed to generate download URL for document.completed', err);
@@ -552,7 +552,7 @@ async function PDF(req) {
                   _resDoc.Signers,
                   _resDoc.ExtUserPtr
                 ),
-              });
+              }, _resDoc.CallbackUrl || null);
             });
         } else {
           unlinkFile(pfxname);

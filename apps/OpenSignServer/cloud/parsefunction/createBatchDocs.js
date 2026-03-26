@@ -335,50 +335,13 @@ async function startBulkSendInBackground(userId, Documents, Ip, parseConfig, typ
 }
 
 export default async function createBatchDocs(request) {
-  const strDocuments = request.params.Documents;
-  const sessionToken = request.headers?.sessiontoken;
-  const type = request.headers?.type || 'quicksend';
-  const Documents = JSON.parse(strDocuments);
-
-  const Ip = request?.headers?.['x-real-ip'] || '';
-  // Access the host from the headers
-  const publicUrl = request.headers.public_url;
-  const parseConfig = {
-    baseURL: serverUrl,
-    headers: {
-      'X-Parse-Application-Id': appId,
-      'X-Parse-Session-Token': sessionToken,
-      'Content-Type': 'application/json',
-    },
-  };
-  try {
-    let userId = '';
-
-    if (request?.user) {
-      userId = request.user.id;
-      // return await batchQuery(request.user.id, Documents, Ip, parseConfig, type, publicUrl);
-    }
-    if (!userId) {
-      throw new Parse.Error(Parse.Error.INVALID_SESSION_TOKEN, 'User is not authenticated.');
-    }
-
-    // quicksend
-    return await startBulkSendInBackground(userId, Documents, Ip, parseConfig, type, publicUrl);
-  } catch (err) {
-    console.log('createbatchdoc error: ', err);
-    const code = err?.code || 400;
-    const msg = err?.message || 'Something went wrong.';
-    throw new Parse.Error(code, msg);
-  }
-}
-
-export default async function createBatchDocs(request) {
   if (!request?.user) {
     throw new Parse.Error(Parse.Error.INVALID_SESSION_TOKEN, 'User is not authenticated.');
   }
   if (!request.params?.Documents) {
     throw new Parse.Error(Parse.Error.INVALID_QUERY, 'Please provide Documents parameter.');
   }
+
   let Documents;
   try {
     Documents = JSON.parse(request.params.Documents);
@@ -388,23 +351,33 @@ export default async function createBatchDocs(request) {
   if (!Array.isArray(Documents) || Documents.length === 0) {
     throw new Parse.Error(Parse.Error.INVALID_QUERY, 'Documents must be a non-empty array.');
   }
-  const publicUrl = process.env.PUBLIC_URL || process.env.SERVER_URL || 'https://localhost:3001';
-  const ip = request.headers['x-forwarded-for'] || request.headers['x-real-ip'] || request.ip || '';
+
+  const type = request.headers?.type || 'quicksend';
+  const publicUrl =
+    request.headers?.public_url ||
+    process.env.PUBLIC_URL ||
+    process.env.SERVER_URL ||
+    'https://localhost:3001';
+  const ip =
+    request.headers?.['x-forwarded-for'] ||
+    request.headers?.['x-real-ip'] ||
+    request.ip ||
+    '';
   const parseConfig = {
-    baseURL: cloudServerUrl,
+    baseURL: serverUrl,
     headers: {
       'Content-Type': 'application/json',
-      'X-Parse-Application-Id': serverAppId,
+      'X-Parse-Application-Id': appId,
       'X-Parse-Session-Token': request.user.getSessionToken(),
     },
   };
-  const result = await startBulkSendInBackground(
-    request.user.id,
-    Documents,
-    ip,
-    parseConfig,
-    'bulksend',
-    publicUrl
-  );
-  return result;
+
+  try {
+    return await startBulkSendInBackground(request.user.id, Documents, ip, parseConfig, type, publicUrl);
+  } catch (err) {
+    console.log('createbatchdoc error: ', err);
+    const code = err?.code || 400;
+    const msg = err?.message || 'Something went wrong.';
+    throw new Parse.Error(code, msg);
+  }
 }

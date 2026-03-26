@@ -74,6 +74,8 @@ Frontend env vars must be prefixed with `REACT_APP_` (Vite config maps them from
 
 **Batch Documents**: `cloud/parsefunction/createBatchDocs.js`. Bulk document creation.
 
+**Webhooks**: `utils/webhook.js` dispatches `document.signed` and `document.completed` events to `WEBHOOK_URL` with HMAC-SHA256 signing (`WEBHOOK_SECRET`). Integration points are in `cloud/parsefunction/pdf/PDF.js`. Fire-and-forget, no retries.
+
 ## Key Patterns
 
 - Cloud functions are in `apps/OpenSignServer/cloud/parsefunction/` and registered in `cloud/main.js`

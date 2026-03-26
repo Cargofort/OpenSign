@@ -290,6 +290,13 @@ if (!process.env.TESTING) {
   httpServer.headersTimeout = 100000; // in milliseconds
   httpServer.listen(port, '0.0.0.0', function () {
     console.log('opensign-server running on port ' + port + '.');
+    if (process.env.WEBHOOK_URL && !process.env.WEBHOOK_SECRET) {
+      console.warn(
+        '[Webhook] WEBHOOK_URL is set but WEBHOOK_SECRET is missing — webhooks are disabled. Both must be configured.'
+      );
+    } else if (process.env.WEBHOOK_URL && process.env.WEBHOOK_SECRET) {
+      console.log(`[Webhook] Webhooks enabled — delivering events to ${process.env.WEBHOOK_URL}`);
+    }
     const isWindows = process.platform === 'win32';
     // console.log('isWindows', isWindows);
     runDbMigrations();

@@ -42,9 +42,9 @@ function makeS3Client() {
   });
 }
 
-export default async function getPresignedUrl(url) {
+export default async function getPresignedUrl(url, customExpiresIn) {
   if (url?.includes('files')) {
-    return presignedlocalUrl(url);
+    return presignedlocalUrl(url, customExpiresIn);
   } else {
     const client = makeS3Client();
 
@@ -53,8 +53,7 @@ export default async function getPresignedUrl(url) {
     const key = extractKeyFromUrl(url);
 
     const command = new GetObjectCommand({ Bucket: bucket, Key: key });
-    // Expires: 160 seconds
-    const expiresIn = 160;
+    const expiresIn = customExpiresIn || 160;
 
     // presignedGETURL return presignedUrl with expires time
     const presignedGETURL = await presign(client, command, { expiresIn });

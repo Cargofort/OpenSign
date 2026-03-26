@@ -284,6 +284,7 @@ async function startBulkSendInBackground(userId, Documents, Ip, parseConfig, typ
           ...(x?.NotifyOnSignatures ? { NotifyOnSignatures: x?.NotifyOnSignatures } : {}),
           ...(x?.Bcc?.length > 0 ? { Bcc: x?.Bcc } : {}),
           ...(x?.RedirectUrl ? { RedirectUrl: x?.RedirectUrl } : {}),
+          ...(x?.CallbackUrl ? { CallbackUrl: x?.CallbackUrl } : {}),
           ...(mailBody ? { RequestBody: mailBody } : {}),
           ...(mailSubject ? { RequestSubject: mailSubject } : {}),
           ...(EmailEditorType ? { EmailEditorType: EmailEditorType } : {}),

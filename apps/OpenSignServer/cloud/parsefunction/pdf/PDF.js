@@ -17,6 +17,8 @@ import { SignPdf } from '@signpdf/signpdf';
 import { P12Signer } from '@signpdf/signer-p12';
 import { buildDownloadFilename, parseUploadFile } from '../../../utils/fileUtils.js';
 import sendMailWithAttachment from '../sendMailWithAttachment.js';
+import { dispatchWebhook } from '../../../utils/webhook.js';
+import getPresignedUrl from '../getSignedUrl.js';
 
 const serverUrl = cloudServerUrl; // process.env.SERVER_URL;
 const APPID = serverAppId;
@@ -305,6 +307,26 @@ async function sendMailsaveCertifcate(doc, pfx, isCustomMail, mailProvider, file
   return file.imageUrl;
 }
 
+function buildWebhookSigners(auditTrail, signers, extUserPtr) {
+  const signedEntries = (auditTrail || []).filter(e => e.Activity === 'Signed');
+  return signedEntries.map(entry => {
+    const signerId = entry.UserPtr?.objectId;
+    let signer;
+    if (signers?.length > 0) {
+      signer = signers.find(s => s.objectId === signerId);
+    }
+    if (!signer && extUserPtr?.objectId === signerId) {
+      signer = extUserPtr;
+    }
+    return {
+      id: signerId,
+      name: signer?.Name || '',
+      email: signer?.Email || '',
+      signedOn: entry.SignedOn,
+    };
+  });
+}
+
 /**
  * Process a PDF for signing:
  * - updates audit trail, generates certificate.
@@ -473,6 +495,25 @@ async function PDF(req) {
           isCompleted ? documentHash : undefined
         );
         sendNotifyMail(_resDoc, signUser, mailProvider, publicUrl);
+        const signedAuditEntries = updatedDoc.AuditTrail?.filter(e => e.Activity === 'Signed') || [];
+        const nonPrefillPlaceholders = _resDoc.Placeholders?.filter(x => x.Role !== 'prefill') || [];
+        const totalSigners = _resDoc.Signers?.length > 0 ? nonPrefillPlaceholders.length : 1;
+        dispatchWebhook('document.signed', {
+          document: {
+            id: _resDoc.objectId,
+            name: _resDoc.Name,
+            isCompleted: updatedDoc.isCompleted,
+          },
+          signer: {
+            id: signUser.objectId,
+            name: signUser.Name,
+            email: signUser.Email,
+          },
+          progress: {
+            signed: signedAuditEntries.length,
+            total: totalSigners,
+          },
+        }, _resDoc.CallbackUrl || null);
         saveFileUsage(pdfSize, data.imageUrl, _resDoc?.CreatedBy?.objectId);
         if (updatedDoc && updatedDoc.isCompleted) {
           const hashForDoc = documentHash || updatedDoc?.DocumentHash;
@@ -481,6 +522,38 @@ async function PDF(req) {
             doc.DocumentHash = hashForDoc;
           }
           sendMailsaveCertifcate(doc, pfx, isCustomMail, mailProvider, `signed_${name}`);
+          getPresignedUrl(data.imageUrl, 3600)
+            .then(downloadUrl => {
+              dispatchWebhook('document.completed', {
+                document: {
+                  id: _resDoc.objectId,
+                  name: _resDoc.Name,
+                  isCompleted: true,
+                  downloadUrl: downloadUrl,
+                },
+                signers: buildWebhookSigners(
+                  updatedDoc.AuditTrail,
+                  _resDoc.Signers,
+                  _resDoc.ExtUserPtr
+                ),
+              }, _resDoc.CallbackUrl || null);
+            })
+            .catch(err => {
+              console.error('[Webhook] Failed to generate download URL for document.completed', err);
+              dispatchWebhook('document.completed', {
+                document: {
+                  id: _resDoc.objectId,
+                  name: _resDoc.Name,
+                  isCompleted: true,
+                  downloadUrl: null,
+                },
+                signers: buildWebhookSigners(
+                  updatedDoc.AuditTrail,
+                  _resDoc.Signers,
+                  _resDoc.ExtUserPtr
+                ),
+              }, _resDoc.CallbackUrl || null);
+            });
         } else {
           unlinkFile(pfxname);
         }

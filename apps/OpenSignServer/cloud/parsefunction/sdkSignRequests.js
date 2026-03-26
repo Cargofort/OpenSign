@@ -326,6 +326,13 @@ export default async function sdkSignRequests(request) {
         : parseStrictBoolean(request.params?.send_in_order, 'send_in_order');
     const pdfBase64 = request.params?.pdf_base64;
     const signers = Array.isArray(request.params?.signers) ? request.params.signers : [];
+    const callbackUrl = request.params?.callback_url ?? null;
+    if (callbackUrl !== null) {
+      if (typeof callbackUrl !== 'string' || callbackUrl.length > 2048)
+        throw new Parse.Error(400, 'callback_url must be a string <= 2048 chars');
+      if (!callbackUrl.startsWith('https://'))
+        throw new Parse.Error(400, 'callback_url must be an HTTPS URL');
+    }
 
     if (!title) throw new Parse.Error(400, 'title is required');
     if (title.length > 250) throw new Parse.Error(400, 'title must be <= 250 characters');
@@ -432,6 +439,7 @@ export default async function sdkSignRequests(request) {
       SendinOrder: sendInOrder,
       TimeToCompleteDays: 15,
       AutomaticReminders: false,
+      ...(callbackUrl ? { CallbackUrl: callbackUrl } : {}),
     };
 
     let documentId = '';

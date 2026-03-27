@@ -2,7 +2,7 @@
 
 ## Overview
 
-Add an optional `metadata` field to the SDK sign request API. The metadata is stored on the document and echoed back in both `document.signed` and `document.completed` webhook payloads. This closes the loop for automated CRM filing: n8n sends a sign request with CRM identifiers, and receives them back in the webhook callback so it knows which record to update.
+Add an optional `metadata` field to the SDK sign request API. The metadata is stored on the document and echoed back in both `document.signed` and `document.completed` webhook payloads. This closes the loop for automated CRM filing: service sends a sign request with CRM identifiers, and receives them back in the webhook callback so it knows which record to update.
 
 ## Scope
 
@@ -98,7 +98,7 @@ Both events gain a top-level `metadata` key when the document has metadata. The 
 
 ### Threading metadata through the stack
 
-```
+```text
 sdkSignRequests.js
   - reads request.params.metadata
   - validates: must be plain object if present

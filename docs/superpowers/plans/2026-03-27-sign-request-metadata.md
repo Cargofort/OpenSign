@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Add an optional `metadata` field to the SDK sign request API that is stored on the document and echoed in both `document.signed` and `document.completed` webhook payloads, enabling n8n to file signed documents back into the correct CRM record automatically.
+**Goal:** Add an optional `metadata` field to the SDK sign request API that is stored on the document and echoed in both `document.signed` and `document.completed` webhook payloads, enabling service to file signed documents back into the correct CRM record automatically.
 
 **Architecture:** Accept `metadata` (plain JSON object) in `sdkSignRequests`, store it as `Metadata` on `contracts_Document` via the existing `batchdocuments` path, and spread it into the three `dispatchWebhook` call sites in `PDF.js` when present. No schema migration needed (Parse Server is schema-free). No frontend changes.
 
@@ -384,7 +384,7 @@ The optional `metadata` field lets you attach arbitrary key-value data to a sign
     "crm_company_id": "your-company-id"
   }
 }
-` ``
+```
 
 If no `metadata` was provided at sign request time, the `metadata` key is absent from the webhook payload entirely (not `null`).
 ```
@@ -425,7 +425,7 @@ curl -sS -X POST "https://localhost:3001/api/app/functions/sdkSignRequests" \
   -d '{
     "title": "Metadata Test",
     "pdf_base64": "YOUR_PDF_BASE64",
-    "callback_url": "https://your-n8n-or-webhook-site-url/webhook",
+    "callback_url": "https://webhook-site-url/webhook",
     "metadata": {
       "crm_id": "TEST-001",
       "crm_company_id": "COMPANY-XYZ"
@@ -446,7 +446,7 @@ Using Parse Dashboard or a direct query, confirm the created `contracts_Document
 
 - [ ] **Step 4: Sign the document and verify webhook payload**
 
-Open the signing URL (`/placeHolderSign/<documentId>`) and sign. Check your webhook receiver (n8n or webhook.site) received:
+Open the signing URL (`/placeHolderSign/<documentId>`) and sign. Check your webhook receiver received:
 - `document.signed` event with a `metadata` key containing `{ crm_id: "TEST-001", crm_company_id: "COMPANY-XYZ" }`
 - `document.completed` event (when all signers done) with the same `metadata` key
 

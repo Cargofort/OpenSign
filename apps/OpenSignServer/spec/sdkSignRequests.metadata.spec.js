@@ -1,5 +1,5 @@
 // Unit tests for the metadata validation logic.
-// These test the pure helper in isolation — no Parse Server needed.
+// These test the pure helper in isolation — Parse is initialized by spec/helper.js.
 
 import { validateMetadata } from '../cloud/parsefunction/sdkSignRequests.js';
 
@@ -18,22 +18,32 @@ describe('validateMetadata', () => {
   });
 
   it('throws Parse.Error 400 when metadata is null', () => {
-    expect(() => validateMetadata(null)).toThrowError();
+    expect(() => validateMetadata(null)).toThrowMatching(
+      err => err instanceof Parse.Error && err.code === 400
+    );
   });
 
   it('throws Parse.Error 400 when metadata is an array', () => {
-    expect(() => validateMetadata(['a', 'b'])).toThrowError();
+    expect(() => validateMetadata(['a', 'b'])).toThrowMatching(
+      err => err instanceof Parse.Error && err.code === 400
+    );
   });
 
   it('throws Parse.Error 400 when metadata is a string', () => {
-    expect(() => validateMetadata('hello')).toThrowError();
+    expect(() => validateMetadata('hello')).toThrowMatching(
+      err => err instanceof Parse.Error && err.code === 400
+    );
   });
 
   it('throws Parse.Error 400 when metadata is a number', () => {
-    expect(() => validateMetadata(42)).toThrowError();
+    expect(() => validateMetadata(42)).toThrowMatching(
+      err => err instanceof Parse.Error && err.code === 400
+    );
   });
 
   it('throws Parse.Error 400 when metadata is a boolean', () => {
-    expect(() => validateMetadata(true)).toThrowError();
+    expect(() => validateMetadata(true)).toThrowMatching(
+      err => err instanceof Parse.Error && err.code === 400
+    );
   });
 });

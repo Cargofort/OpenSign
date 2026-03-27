@@ -2,7 +2,7 @@
 
 ## Overview
 
-Add an optional `metadata` field to the SDK sign request API. The metadata is stored on the document and echoed back in both `document.signed` and `document.completed` webhook payloads. This closes the loop for automated CRM filing: service sends a sign request with CRM identifiers, and receives them back in the webhook callback so it knows which record to update.
+Add an optional `metadata` field to the SDK sign request API. The metadata is stored on the document and echoed back in both `document.signed` and `document.completed` webhook payloads. This closes the loop for automated filing: service sends a sign request with identifiers, and receives them back in the webhook callback so it knows which record to update.
 
 ## Scope
 
@@ -20,8 +20,8 @@ New optional field `metadata` in the JSON request body:
   "signers": [...],
   "callback_url": "https://...",
   "metadata": {
-    "crm_id": "XYZ",
-    "crm_company_id": "ZYS"
+    "id": "XYZ",
+    "company_id": "ZYS"
   }
 }
 ```
@@ -66,8 +66,8 @@ Both events gain a top-level `metadata` key when the document has metadata. The 
     "total": 2
   },
   "metadata": {
-    "crm_id": "XYZ",
-    "crm_company_id": "ZYS"
+    "id": "XYZ",
+    "company_id": "ZYS"
   }
 }
 ```
@@ -88,8 +88,8 @@ Both events gain a top-level `metadata` key when the document has metadata. The 
     { "id": "xyz789", "name": "Jane Doe", "email": "jane@example.com", "signedOn": "..." }
   ],
   "metadata": {
-    "crm_id": "XYZ",
-    "crm_company_id": "ZYS"
+    "id": "XYZ",
+    "company_id": "ZYS"
   }
 }
 ```

@@ -54,8 +54,8 @@ curl -sS -X POST "BASE_URL/api/app/functions/sdkSignRequests" \
     "send_in_order": true,
     "callback_url": "https://your-system.example.com/webhooks/opensign",
     "metadata": {
-      "crm_id": "your-crm-record-id",
-      "crm_company_id": "your-company-id"
+      "id": "your-record-id",
+      "company_id": "your-company-id"
     },
     "pdf_base64": "PDF_BASE64",
     "signers": [
@@ -98,7 +98,7 @@ The optional `metadata` field lets you attach arbitrary key-value data to a sign
 
 **Type:** Plain JSON object. Any JSON-serializable values are accepted (strings, numbers, booleans, nested objects).
 
-**Use case:** Pass CRM identifiers (e.g. `crm_id`, `crm_company_id`) so your webhook receiver can automatically file the signed document against the correct record — no manual matching needed.
+**Use case:** Pass identifiers (e.g. `id`, `company_id`) so your webhook receiver can automatically file the signed document against the correct record — no manual matching needed.
 
 **Validation:**
 - Optional. Omitting it is valid.
@@ -113,8 +113,8 @@ The optional `metadata` field lets you attach arbitrary key-value data to a sign
   "document": { "id": "...", "name": "...", "isCompleted": true, "downloadUrl": "..." },
   "signers": [...],
   "metadata": {
-    "crm_id": "your-crm-record-id",
-    "crm_company_id": "your-company-id"
+    "id": "your-record-id",
+    "company_id": "your-company-id"
   }
 }
 ```

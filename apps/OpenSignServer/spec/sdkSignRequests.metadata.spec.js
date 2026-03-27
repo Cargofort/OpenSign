@@ -9,7 +9,7 @@ describe('validateMetadata', () => {
   });
 
   it('returns the object when metadata is a plain object', () => {
-    const m = { crm_id: 'XYZ', crm_company_id: 'ZYS' };
+    const m = { id: 'XYZ', company_id: 'ZYS' };
     expect(validateMetadata(m)).toEqual(m);
   });
 

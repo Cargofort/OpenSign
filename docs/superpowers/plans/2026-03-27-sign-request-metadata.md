@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Add an optional `metadata` field to the SDK sign request API that is stored on the document and echoed in both `document.signed` and `document.completed` webhook payloads, enabling service to file signed documents back into the correct CRM record automatically.
+**Goal:** Add an optional `metadata` field to the SDK sign request API that is stored on the document and echoed in both `document.signed` and `document.completed` webhook payloads, enabling service to file signed documents back into the correct record automatically.
 
 **Architecture:** Accept `metadata` (plain JSON object) in `sdkSignRequests`, store it as `Metadata` on `contracts_Document` via the existing `batchdocuments` path, and spread it into the three `dispatchWebhook` call sites in `PDF.js` when present. No schema migration needed (Parse Server is schema-free). No frontend changes.
 
@@ -39,7 +39,7 @@ describe('validateMetadata', () => {
   });
 
   it('returns the object when metadata is a plain object', () => {
-    const m = { crm_id: 'XYZ', crm_company_id: 'ZYS' };
+    const m = { id: 'XYZ', company_id: 'ZYS' };
     expect(validateMetadata(m)).toEqual(m);
   });
 
@@ -349,8 +349,8 @@ In `docs/SDK_SIGN_REQUESTS_API.md`, update the curl example body to include `met
 ```json
     "callback_url": "https://your-system.example.com/webhooks/opensign",
     "metadata": {
-      "crm_id": "your-crm-record-id",
-      "crm_company_id": "your-company-id"
+      "id": "your-record-id",
+      "company_id": "your-company-id"
     },
 ```
 
@@ -365,7 +365,7 @@ The optional `metadata` field lets you attach arbitrary key-value data to a sign
 
 **Type:** Plain JSON object. Any JSON-serializable values are accepted (strings, numbers, booleans, nested objects).
 
-**Use case:** Pass CRM identifiers (e.g. `crm_id`, `crm_company_id`) so your webhook receiver can automatically file the signed document against the correct record — no manual matching needed.
+**Use case:** Pass identifiers (e.g. `id`, `company_id`) so your webhook receiver can automatically file the signed document against the correct record — no manual matching needed.
 
 **Validation:**
 - Optional. Omitting it is valid.
@@ -380,8 +380,8 @@ The optional `metadata` field lets you attach arbitrary key-value data to a sign
   "document": { "id": "...", "name": "...", "isCompleted": true, "downloadUrl": "..." },
   "signers": [...],
   "metadata": {
-    "crm_id": "your-crm-record-id",
-    "crm_company_id": "your-company-id"
+    "id": "your-record-id",
+    "company_id": "your-company-id"
   }
 }
 ```
@@ -427,8 +427,8 @@ curl -sS -X POST "https://localhost:3001/api/app/functions/sdkSignRequests" \
     "pdf_base64": "YOUR_PDF_BASE64",
     "callback_url": "https://webhook-site-url/webhook",
     "metadata": {
-      "crm_id": "TEST-001",
-      "crm_company_id": "COMPANY-XYZ"
+      "id": "TEST-001",
+      "company_id": "COMPANY-XYZ"
     },
     "signers": [{
       "name": "Test Signer",
@@ -442,12 +442,12 @@ Expected response includes `documentId`.
 
 - [ ] **Step 3: Verify `Metadata` stored on document**
 
-Using Parse Dashboard or a direct query, confirm the created `contracts_Document` object has `Metadata: { crm_id: "TEST-001", crm_company_id: "COMPANY-XYZ" }`.
+Using Parse Dashboard or a direct query, confirm the created `contracts_Document` object has `Metadata: { id: "TEST-001", company_id: "COMPANY-XYZ" }`.
 
 - [ ] **Step 4: Sign the document and verify webhook payload**
 
 Open the signing URL (`/placeHolderSign/<documentId>`) and sign. Check your webhook receiver received:
-- `document.signed` event with a `metadata` key containing `{ crm_id: "TEST-001", crm_company_id: "COMPANY-XYZ" }`
+- `document.signed` event with a `metadata` key containing `{ id: "TEST-001", company_id: "COMPANY-XYZ" }`
 - `document.completed` event (when all signers done) with the same `metadata` key
 
 - [ ] **Step 5: Verify invalid metadata is rejected**

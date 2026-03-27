@@ -1,5 +1,5 @@
 // Unit tests for the metadata validation logic.
-// These test the pure helper in isolation — Parse is initialized by spec/helper.js.
+// These test the pure helper in isolation — Parse is initialized by spec/helpers/parseInit.js.
 
 import { validateMetadata } from '../cloud/parsefunction/sdkSignRequests.js';
 

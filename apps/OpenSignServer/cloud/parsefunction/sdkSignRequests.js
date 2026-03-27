@@ -122,6 +122,14 @@ function parseStrictBoolean(value, fieldName) {
   throw new Parse.Error(400, `${fieldName} must be a boolean`);
 }
 
+export function validateMetadata(metadata) {
+  if (metadata === undefined) return undefined;
+  if (metadata === null || typeof metadata !== 'object' || Array.isArray(metadata)) {
+    throw new Parse.Error(400, 'metadata must be a plain JSON object');
+  }
+  return metadata;
+}
+
 function validatePdfBase64Size(pdfBase64) {
   if (typeof pdfBase64 !== 'string') return;
   if (pdfBase64.length > MAX_PDF_BASE64_CHARS) {
@@ -334,6 +342,8 @@ export default async function sdkSignRequests(request) {
         throw new Parse.Error(400, 'callback_url must be an HTTPS URL');
     }
 
+    const metadata = validateMetadata(request.params?.metadata);
+
     if (!title) throw new Parse.Error(400, 'title is required');
     if (title.length > 250) throw new Parse.Error(400, 'title must be <= 250 characters');
     if (description.length > 500) throw new Parse.Error(400, 'description must be <= 500 characters');
@@ -440,6 +450,7 @@ export default async function sdkSignRequests(request) {
       TimeToCompleteDays: 15,
       AutomaticReminders: false,
       ...(callbackUrl ? { CallbackUrl: callbackUrl } : {}),
+      ...(metadata ? { Metadata: metadata } : {}),
     };
 
     let documentId = '';

@@ -285,6 +285,7 @@ async function startBulkSendInBackground(userId, Documents, Ip, parseConfig, typ
           ...(x?.Bcc?.length > 0 ? { Bcc: x?.Bcc } : {}),
           ...(x?.RedirectUrl ? { RedirectUrl: x?.RedirectUrl } : {}),
           ...(x?.CallbackUrl ? { CallbackUrl: x?.CallbackUrl } : {}),
+          ...(x?.Metadata ? { Metadata: x.Metadata } : {}),
           ...(mailBody ? { RequestBody: mailBody } : {}),
           ...(mailSubject ? { RequestSubject: mailSubject } : {}),
           ...(EmailEditorType ? { EmailEditorType: EmailEditorType } : {}),

@@ -53,6 +53,10 @@ curl -sS -X POST "BASE_URL/api/app/functions/sdkSignRequests" \
     "description": "Please sign your vacation request.",
     "send_in_order": true,
     "callback_url": "https://your-system.example.com/webhooks/opensign",
+    "metadata": {
+      "id": "your-record-id",
+      "company_id": "your-company-id"
+    },
     "pdf_base64": "PDF_BASE64",
     "signers": [
       {
@@ -87,6 +91,35 @@ The optional `callback_url` field registers a per-document webhook URL. When set
 - Payload shape is identical to the global webhook.
 - If `WEBHOOK_SECRET` is configured on the server, each POST is HMAC-SHA256 signed via the `x-webhook-signature` header (same as the global webhook). Otherwise the request is sent unsigned.
 - Fire-and-forget: errors are logged server-side but never interrupt the signing flow.
+
+## Metadata
+
+The optional `metadata` field lets you attach arbitrary key-value data to a sign request. The server stores it on the document and echoes it back in every webhook event fired for that document (`document.signed` and `document.completed`).
+
+**Type:** Plain JSON object. Any JSON-serializable values are accepted (strings, numbers, booleans, nested objects).
+
+**Use case:** Pass identifiers (e.g. `id`, `company_id`) so your webhook receiver can automatically file the signed document against the correct record — no manual matching needed.
+
+**Validation:**
+- Optional. Omitting it is valid.
+- If provided, must be a plain JSON object. Arrays, primitives, and `null` are rejected with `400`.
+
+**Webhook payload (with metadata):**
+
+```json
+{
+  "event": "document.completed",
+  "timestamp": "2026-03-27T10:05:00.000Z",
+  "document": { "id": "...", "name": "...", "isCompleted": true, "downloadUrl": "..." },
+  "signers": [...],
+  "metadata": {
+    "id": "your-record-id",
+    "company_id": "your-company-id"
+  }
+}
+```
+
+If no `metadata` was provided at sign request time, the `metadata` key is absent from the webhook payload entirely (not `null`).
 
 ## Notes / limits (v1)
 

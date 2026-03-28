@@ -513,6 +513,7 @@ async function PDF(req) {
             signed: signedAuditEntries.length,
             total: totalSigners,
           },
+          ...(_resDoc.Metadata ? { metadata: _resDoc.Metadata } : {}),
         }, _resDoc.CallbackUrl || null);
         saveFileUsage(pdfSize, data.imageUrl, _resDoc?.CreatedBy?.objectId);
         if (updatedDoc && updatedDoc.isCompleted) {
@@ -536,6 +537,7 @@ async function PDF(req) {
                   _resDoc.Signers,
                   _resDoc.ExtUserPtr
                 ),
+                ...(_resDoc.Metadata ? { metadata: _resDoc.Metadata } : {}),
               }, _resDoc.CallbackUrl || null);
             })
             .catch(err => {
@@ -552,6 +554,7 @@ async function PDF(req) {
                   _resDoc.Signers,
                   _resDoc.ExtUserPtr
                 ),
+                ...(_resDoc.Metadata ? { metadata: _resDoc.Metadata } : {}),
               }, _resDoc.CallbackUrl || null);
             });
         } else {

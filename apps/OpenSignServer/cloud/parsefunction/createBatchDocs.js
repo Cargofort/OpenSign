@@ -104,6 +104,23 @@ async function deductcount(docsCount, extUserId) {
     console.log('batchdoc deductcount error: ', err);
   }
 }
+
+export function resolveDocumentMailSender(document) {
+  const senderName = document?.SenderName || document.ExtUserPtr.Name;
+  const senderEmail = document?.SenderMail || document.ExtUserPtr.Email;
+  const from =
+    document?.SenderName || document?.ExtUserPtr?.UseNameAsSender === true
+      ? senderName
+      : senderEmail;
+
+  return {
+    senderName,
+    senderEmail,
+    from,
+    replyto: senderEmail || '',
+  };
+}
+
 async function sendMail(document, publicUrl) {
   const baseUrl = new URL(publicUrl);
   const timeToCompleteDays = document?.TimeToCompleteDays || 15;
@@ -116,12 +133,7 @@ async function sendMail(document, publicUrl) {
     year: 'numeric',
   });
   let signerMail = document.Placeholders?.filter(x => x?.Role !== 'prefill');
-  const senderName = document?.SenderName || document.ExtUserPtr.Name;
-  const senderEmail = document?.SenderMail || document.ExtUserPtr.Email;
-  const from =
-    document?.SenderName || document?.ExtUserPtr?.UseNameAsSender === true
-      ? document.ExtUserPtr.Name
-      : senderEmail;
+  const { senderName, senderEmail, from, replyto } = resolveDocumentMailSender(document);
 
   if (document.SendinOrder) {
     signerMail = signerMail.slice();
@@ -184,7 +196,7 @@ async function sendMail(document, publicUrl) {
         recipient: existSigner?.Email || signerMail[i].email,
         subject: replaceVar?.subject ? replaceVar?.subject : defaultRequestTemplate.subject,
         from: from,
-        replyto: senderEmail || '',
+        replyto: replyto,
         html: replaceVar?.body ? replaceVar?.body : defaultRequestTemplate.body,
         applyBranding: true,
         brandingHeader: 'Digital Signature Request',

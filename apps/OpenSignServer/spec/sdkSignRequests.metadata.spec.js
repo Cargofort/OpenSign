@@ -1,7 +1,10 @@
 // Unit tests for the metadata validation logic.
 // These test the pure helper in isolation — Parse is initialized by spec/helpers/parseInit.js.
 
-import { validateMetadata } from '../cloud/parsefunction/sdkSignRequests.js';
+import {
+  resolveSdkSignRequestSender,
+  validateMetadata,
+} from '../cloud/parsefunction/sdkSignRequests.js';
 
 describe('validateMetadata', () => {
   it('returns undefined when metadata is undefined (omitted)', () => {
@@ -45,5 +48,44 @@ describe('validateMetadata', () => {
     expect(() => validateMetadata(true)).toThrowMatching(
       err => err instanceof Parse.Error && err.code === 400
     );
+  });
+});
+
+describe('resolveSdkSignRequestSender', () => {
+  const originalName = process.env.SDK_SIGN_REQUEST_FROM_NAME;
+  const originalReplyTo = process.env.SDK_SIGN_REQUEST_REPLY_TO;
+
+  afterEach(() => {
+    if (originalName === undefined) {
+      delete process.env.SDK_SIGN_REQUEST_FROM_NAME;
+    } else {
+      process.env.SDK_SIGN_REQUEST_FROM_NAME = originalName;
+    }
+
+    if (originalReplyTo === undefined) {
+      delete process.env.SDK_SIGN_REQUEST_REPLY_TO;
+    } else {
+      process.env.SDK_SIGN_REQUEST_REPLY_TO = originalReplyTo;
+    }
+  });
+
+  it('uses Cargofort SDK defaults when env vars are missing', () => {
+    delete process.env.SDK_SIGN_REQUEST_FROM_NAME;
+    delete process.env.SDK_SIGN_REQUEST_REPLY_TO;
+
+    expect(resolveSdkSignRequestSender()).toEqual({
+      SenderName: 'Cargofort Sign',
+      SenderMail: 'marian.atanasov@cargofort.com',
+    });
+  });
+
+  it('uses SDK sender env vars when configured', () => {
+    process.env.SDK_SIGN_REQUEST_FROM_NAME = 'Custom SDK Sender';
+    process.env.SDK_SIGN_REQUEST_REPLY_TO = 'custom@example.com';
+
+    expect(resolveSdkSignRequestSender()).toEqual({
+      SenderName: 'Custom SDK Sender',
+      SenderMail: 'custom@example.com',
+    });
   });
 });

@@ -13,7 +13,7 @@ const MAX_PAGE_NUMBER = 5000;
 const MAX_COORDINATE = 10000;
 const MAX_WIDGET_DIMENSION = 2000;
 const DEFAULT_SDK_SIGN_REQUEST_FROM_NAME = 'Cargofort Sign';
-const DEFAULT_SDK_SIGN_REQUEST_REPLY_TO = 'marian.atanasov@cargofort.com';
+const DEFAULT_SDK_SIGN_REQUEST_REPLY_TO = 'no-reply@your-domain.example';
 
 function newRequestId() {
   // Keep it short (log-friendly).

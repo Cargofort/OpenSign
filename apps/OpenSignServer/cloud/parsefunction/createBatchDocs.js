@@ -106,8 +106,8 @@ async function deductcount(docsCount, extUserId) {
 }
 
 export function resolveDocumentMailSender(document) {
-  const senderName = document?.SenderName || document.ExtUserPtr.Name;
-  const senderEmail = document?.SenderMail || document.ExtUserPtr.Email;
+  const senderName = document?.SenderName || document?.ExtUserPtr?.Name;
+  const senderEmail = document?.SenderMail || document?.ExtUserPtr?.Email;
   const from =
     document?.SenderName || document?.ExtUserPtr?.UseNameAsSender === true
       ? senderName

@@ -4,7 +4,7 @@ describe('resolveDocumentMailSender', () => {
   it('uses explicit SDK sender name for From display and explicit sender mail for Reply-To', () => {
     const document = {
       SenderName: 'Cargofort Sign',
-      SenderMail: 'marian.atanasov@cargofort.com',
+      SenderMail: 'no-reply@example.com',
       ExtUserPtr: {
         Name: 'SDK Admin',
         Email: 'sdk-admin@example.com',
@@ -13,9 +13,9 @@ describe('resolveDocumentMailSender', () => {
 
     expect(resolveDocumentMailSender(document)).toEqual({
       senderName: 'Cargofort Sign',
-      senderEmail: 'marian.atanasov@cargofort.com',
+      senderEmail: 'no-reply@example.com',
       from: 'Cargofort Sign',
-      replyto: 'marian.atanasov@cargofort.com',
+      replyto: 'no-reply@example.com',
     });
   });
 
@@ -32,6 +32,36 @@ describe('resolveDocumentMailSender', () => {
       senderEmail: 'regular@example.com',
       from: 'regular@example.com',
       replyto: 'regular@example.com',
+    });
+  });
+
+  it('uses external user name as From display when requested and no explicit sender name is set', () => {
+    const document = {
+      ExtUserPtr: {
+        Name: 'Regular User',
+        Email: 'regular@example.com',
+        UseNameAsSender: true,
+      },
+    };
+
+    expect(resolveDocumentMailSender(document)).toEqual({
+      senderName: 'Regular User',
+      senderEmail: 'regular@example.com',
+      from: 'Regular User',
+      replyto: 'regular@example.com',
+    });
+  });
+
+  it('falls back to explicit sender mail when external user is absent', () => {
+    const document = {
+      SenderMail: 'no-reply@example.com',
+    };
+
+    expect(resolveDocumentMailSender(document)).toEqual({
+      senderName: undefined,
+      senderEmail: 'no-reply@example.com',
+      from: 'no-reply@example.com',
+      replyto: 'no-reply@example.com',
     });
   });
 });

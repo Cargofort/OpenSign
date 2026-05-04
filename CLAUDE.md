@@ -21,6 +21,15 @@ OpenSign is an open-source e-signature platform (DocuSign alternative). This is 
 
 ## Development Commands
 
+### Container-Only Development
+
+Do **not** run project code, package scripts, installs, tests, linters, builds, database tools, or app servers directly on the host machine. All execution must happen inside Docker containers.
+
+- Use host commands only to manage Docker itself, inspect files, or edit files.
+- Use `docker compose exec <service> ...` for commands in already-running containers.
+- Use `docker compose run --rm <service> ...` for one-off commands when a container is not running.
+- Do not run local `npm`, `node`, `jasmine`, `vite`, `mongodb-runner`, or similar project tooling on the host.
+
 ### Docker (full stack)
 ```bash
 make build              # Build and start all containers (requires HOST_URL env var)
@@ -31,20 +40,20 @@ make ssh                # Shell into the server container
 
 ### Frontend (`apps/OpenSign/`)
 ```bash
-npm run dev             # Vite dev server on port 3000
-npm run build           # Production build (8GB heap)
-npm test                # Run all tests (vitest)
-npm run test:watch      # Watch mode tests
+docker compose exec client npm run dev
+docker compose exec client npm run build
+docker compose exec client npm test
+docker compose exec client npm run test:watch
 ```
 
 ### Backend (`apps/OpenSignServer/`)
 ```bash
-npm start               # Start server
-npm run watch           # Dev with nodemon auto-reload
-npm test                # Run tests (requires mongodb-runner, jasmine)
-npm run coverage        # Tests with nyc coverage
-npm run lint            # ESLint on cloud/, index.js, spec/
-npm run lint-fix        # Auto-fix lint issues
+docker compose exec server npm start
+docker compose exec server npm run watch
+docker compose exec server npm test
+docker compose exec server npm run coverage
+docker compose exec server npm run lint
+docker compose exec server npm run lint-fix
 ```
 
 ### Root

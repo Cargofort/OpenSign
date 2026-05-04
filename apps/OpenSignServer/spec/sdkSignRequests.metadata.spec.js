@@ -75,7 +75,7 @@ describe('resolveSdkSignRequestSender', () => {
 
     expect(resolveSdkSignRequestSender()).toEqual({
       SenderName: 'Cargofort Sign',
-      SenderMail: 'marian.atanasov@cargofort.com',
+      SenderMail: 'no-reply@your-domain.example',
     });
   });
 

@@ -26,8 +26,8 @@ OpenSign is an open-source e-signature platform (DocuSign alternative). This is 
 Do **not** run project code, package scripts, installs, tests, linters, builds, database tools, or app servers directly on the host machine. All execution must happen inside Docker containers.
 
 - Use host commands only to manage Docker itself, inspect files, or edit files.
-- Use `docker compose exec <service> ...` for commands in already-running containers.
-- Use `docker compose run --rm <service> ...` for one-off commands when a container is not running.
+- For container execution, use `docker compose exec <service> ...` in already-running containers.
+- For one-off runs, use `docker compose run --rm <service> ...` when a container is not running.
 - Do not run local `npm`, `node`, `jasmine`, `vite`, `mongodb-runner`, or similar project tooling on the host.
 
 ### Docker (full stack)

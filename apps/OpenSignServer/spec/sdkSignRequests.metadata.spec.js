@@ -79,6 +79,16 @@ describe('resolveSdkSignRequestSender', () => {
     });
   });
 
+  it('uses Cargofort SDK defaults when env vars are blank', () => {
+    process.env.SDK_SIGN_REQUEST_FROM_NAME = '   ';
+    process.env.SDK_SIGN_REQUEST_REPLY_TO = '   ';
+
+    expect(resolveSdkSignRequestSender()).toEqual({
+      SenderName: 'Cargofort Sign',
+      SenderMail: 'no-reply@your-domain.example',
+    });
+  });
+
   it('uses SDK sender env vars when configured', () => {
     process.env.SDK_SIGN_REQUEST_FROM_NAME = 'Custom SDK Sender';
     process.env.SDK_SIGN_REQUEST_REPLY_TO = 'custom@example.com';

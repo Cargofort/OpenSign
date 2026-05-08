@@ -12,6 +12,8 @@ const MAX_TOTAL_POSITIONS = 400;
 const MAX_PAGE_NUMBER = 5000;
 const MAX_COORDINATE = 10000;
 const MAX_WIDGET_DIMENSION = 2000;
+const DEFAULT_SDK_SIGN_REQUEST_FROM_NAME = 'Cargofort Sign';
+const DEFAULT_SDK_SIGN_REQUEST_REPLY_TO = 'no-reply@your-domain.example';
 
 function newRequestId() {
   // Keep it short (log-friendly).
@@ -128,6 +130,14 @@ export function validateMetadata(metadata) {
     throw new Parse.Error(400, 'metadata must be a plain JSON object');
   }
   return metadata;
+}
+
+export function resolveSdkSignRequestSender() {
+  return {
+    SenderName:
+      process.env.SDK_SIGN_REQUEST_FROM_NAME?.trim() || DEFAULT_SDK_SIGN_REQUEST_FROM_NAME,
+    SenderMail: process.env.SDK_SIGN_REQUEST_REPLY_TO?.trim() || DEFAULT_SDK_SIGN_REQUEST_REPLY_TO,
+  };
 }
 
 function validatePdfBase64Size(pdfBase64) {
@@ -444,6 +454,7 @@ export default async function sdkSignRequests(request) {
       URL: pdfUrl,
       CreatedBy: { __type: 'Pointer', className: '_User', objectId: adminUserId },
       ExtUserPtr: extUser, // must include TenantId for email templates (as in UI flow)
+      ...resolveSdkSignRequestSender(),
       Placeholders: placeholders,
       Signers: signerContacts, // pass full objects so ACL creation can include signer CreatedBy pointers
       SendinOrder: sendInOrder,

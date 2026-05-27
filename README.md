@@ -154,14 +154,15 @@ In your OIDC provider, add a custom claim to the userinfo response:
 
 ```json
 {
-  "opensign_role": "admin"
+  "opensign_role": "Admin"
 }
 ```
 
 | Claim value | OpenSign role |
 |---|---|
-| `admin`, `orgadmin`, `org_admin` | `contracts_Admin` |
-| `editor` | `contracts_Editor` |
+| `Admin` | `contracts_Admin` (super-admin, one per system) |
+| `OrgAdmin`, `Org_Admin` | `contracts_OrgAdmin` (recommended for additional admins) |
+| `Editor` | `contracts_Editor` |
 | anything else / missing | `contracts_User` |
 
 > **Important:** Role mapping only runs at signup (first login). For existing users, set `UserRole` directly in the `contracts_Users` MongoDB collection.

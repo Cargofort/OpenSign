@@ -70,6 +70,8 @@ async function saveUser(userDetails, request) {
     user.set('username', userDetails.email);
     user.set('password', userDetails.password);
     user.set('email', userDetails?.email?.toLowerCase()?.replace(/\s/g, ''));
+    user.set('normalizedEmail', normalizedEmail);
+
     if (userDetails?.phone) {
       user.set('phone', userDetails.phone);
     }

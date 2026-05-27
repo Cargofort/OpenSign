@@ -29,8 +29,8 @@ async function sendMailProvider(params) {
       : params?.html || '';
 
   const mailgunApiKey = process.env.MAILGUN_API_KEY;
+  let transporterSMTP;
   try {
-    let transporterSMTP;
     let mailgunClient;
     let mailgunDomain;
     if (smtpenable) {
@@ -151,6 +151,7 @@ async function sendMailProvider(params) {
             attachments: smtpenable ? attachment : undefined,
             attachment: smtpenable ? undefined : attachment,
             bcc: params.bcc ? params.bcc : undefined,
+            cc: params.cc ? params.cc : undefined,
             replyTo: replyto ? replyto : undefined,
           };
           const cleanupPaths = [
@@ -201,6 +202,7 @@ async function sendMailProvider(params) {
         text: params.text || 'mail',
         html: html ? html + reportMsg : '',
         bcc: params.bcc ? params.bcc : undefined,
+        cc: params.cc ? params.cc : undefined,
         replyTo: replyto ? replyto : undefined,
       };
 
@@ -232,6 +234,10 @@ async function sendMailProvider(params) {
     console.log(`sendMailWithAttachment Error: ${err}`);
     if (err) {
       return { status: 'error' };
+    }
+  } finally {
+    if (transporterSMTP) {
+      transporterSMTP?.close?.();
     }
   }
 }

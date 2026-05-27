@@ -43,7 +43,7 @@ function makeS3Client() {
 }
 
 export default async function getPresignedUrl(url, customExpiresIn) {
-  if (url?.includes('files')) {
+  if (url?.includes('/files/')) {
     return presignedlocalUrl(url, customExpiresIn);
   } else {
     const client = makeS3Client();
@@ -69,7 +69,7 @@ export async function getSignedUrl(request) {
 
     if (docId || templateId) {
       try {
-        if (url?.includes('files')) {
+        if (url?.includes('/files/')) {
           return presignedlocalUrl(url);
         } else if (useLocal !== 'true') {
           const query = new Parse.Query(docId ? 'contracts_Document' : 'contracts_Template');
@@ -105,7 +105,7 @@ export async function getSignedUrl(request) {
       if (!isAuth) {
         throw new Parse.Error(Parse.Error.INVALID_SESSION_TOKEN, 'User is not authenticated.');
       } else {
-        if (url?.includes('files')) {
+        if (url?.includes('/files/')) {
           return presignedlocalUrl(url);
         } else if (useLocal !== 'true') {
           const presignedUrl = await getPresignedUrl(url);
@@ -146,7 +146,7 @@ export function getSignedLocalUrl(fileUrl, expirationTimeInSeconds) {
 }
 
 export function presignedlocalUrl(signedUrl, expirationTimeInSeconds) {
-  if (signedUrl?.includes('files')) {
+  if (signedUrl?.includes('/files/')) {
     const fileUrl = signedUrl.split('?')?.[0];
     const secretKey = process.env.MASTER_KEY;
     const exp = expirationTimeInSeconds || 200;

@@ -67,6 +67,7 @@ import setWidgetPreferences from './parsefunction/setWidgetPreferences.js';
 import getGlobalEmailBranding from './parsefunction/getGlobalEmailBranding.js';
 import updateGlobalEmailBranding from './parsefunction/updateGlobalEmailBranding.js';
 import sdkSignRequests from './parsefunction/sdkSignRequests.js';
+import createDocumentFromApp from './parsefunction/createDocumentFromApp.js';
 
 // This afterSave function triggers after an object is added or updated in the specified class, allowing for post-processing logic.
 Parse.Cloud.afterSave('contracts_Document', DocumentAftersave);
@@ -144,3 +145,4 @@ Parse.Cloud.define('setwidgetpreferences', setWidgetPreferences);
 Parse.Cloud.define('getglobalemailbranding', getGlobalEmailBranding);
 Parse.Cloud.define('updateglobalemailbranding', updateGlobalEmailBranding);
 Parse.Cloud.define('sdkSignRequests', sdkSignRequests);
+Parse.Cloud.define('createdocumentfromapp', createDocumentFromApp);

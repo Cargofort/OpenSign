@@ -103,6 +103,7 @@ export default function AuthCallback() {
         const authName =
           userInfo.name || userInfo.given_name || userInfo.preferred_username || authEmail;
         localStorage.setItem("sso_userinfo", JSON.stringify({ name: authName, email: authEmail }));
+        sessionStorage.setItem("sso_access_token", accessToken);
 
         const userJson = user.toJSON();
         const enriched = {

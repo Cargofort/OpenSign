@@ -1,4 +1,7 @@
-export default function reportJson(id, currentUserId) {
+export default function reportJson(id, currentUserId, creatorScope) {
+  const selfPointer = { __type: 'Pointer', className: '_User', objectId: currentUserId };
+  // OrgAdmin passes a { $in: [...] } scope; everyone else gets a single pointer
+  const createdByFilter = creatorScope || selfPointer;
   const commanKeys = [
     'IsSignyourself',
     'URL',
@@ -54,7 +57,7 @@ export default function reportJson(id, currentUserId) {
           IsDeclined: { $ne: true },
           IsArchive: { $ne: true },
           SignedUrl: { $exists: false },
-          CreatedBy: { __type: 'Pointer', className: '_User', objectId: currentUserId },
+          CreatedBy: createdByFilter,
         },
         keys: [...commanKeys, ...filterKeys],
       };
@@ -90,7 +93,7 @@ export default function reportJson(id, currentUserId) {
           IsCompleted: { $ne: true },
           IsDeclined: { $ne: true },
           IsArchive: { $ne: true },
-          CreatedBy: { __type: 'Pointer', className: '_User', objectId: currentUserId },
+          CreatedBy: createdByFilter,
           ExpiryDate: { $gt: { __type: 'Date', iso: new Date().toISOString() } },
         },
         keys: [...inProgressKeys, ...filterKeys],
@@ -105,8 +108,8 @@ export default function reportJson(id, currentUserId) {
           IsDeclined: { $ne: true },
           IsArchive: { $ne: true },
           $or: [
-            // Condition 1: If `CreatedBy` exists, no need for `Signers` filter
-            { CreatedBy: { __type: 'Pointer', className: '_User', objectId: currentUserId } },
+            // Condition 1: org creator match (single pointer or $in for OrgAdmin)
+            { CreatedBy: createdByFilter },
             // Condition 2: If `CreatedBy` does not exist, apply the `Signers` filter
             {
               Signers: {
@@ -130,7 +133,7 @@ export default function reportJson(id, currentUserId) {
           Type: null,
           IsArchive: { $ne: true },
           IsDeclined: true,
-          CreatedBy: { __type: 'Pointer', className: '_User', objectId: currentUserId },
+          CreatedBy: createdByFilter,
         },
         keys: [...commanKeys, 'DeclineReason'],
       };
@@ -145,7 +148,7 @@ export default function reportJson(id, currentUserId) {
           Type: { $ne: 'Folder' },
           SignedUrl: { $ne: null },
           ExpiryDate: { $lt: { __type: 'Date', iso: new Date().toISOString() } },
-          CreatedBy: { __type: 'Pointer', className: '_User', objectId: currentUserId },
+          CreatedBy: createdByFilter,
         },
         keys: [...commanKeys, ...filterKeys],
       };
@@ -160,7 +163,7 @@ export default function reportJson(id, currentUserId) {
           IsCompleted: { $ne: true },
           IsDeclined: { $ne: true },
           IsArchive: { $ne: true },
-          CreatedBy: { __type: 'Pointer', className: '_User', objectId: currentUserId },
+          CreatedBy: createdByFilter,
           ExpiryDate: { $gt: { __type: 'Date', iso: new Date().toISOString() } },
         },
         keys: inProgressKeys,
@@ -196,7 +199,7 @@ export default function reportJson(id, currentUserId) {
           IsDeclined: { $ne: true },
           IsArchive: { $ne: true },
           SignedUrl: { $exists: false },
-          CreatedBy: { __type: 'Pointer', className: '_User', objectId: currentUserId },
+          CreatedBy: createdByFilter,
         },
         keys: commanKeys,
       };

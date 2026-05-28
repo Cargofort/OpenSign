@@ -170,6 +170,25 @@ const DashboardCard = (props) => {
               }
               setresponse(arr.length);
             });
+        } else if (props.Data.Redirect_id === "1MwEuxLEkF") {
+          // Out for signatures: route through getReport so OrgAdmin gets org-wide count
+          const params = {
+            reportId: props.Data.Redirect_id,
+            skip: 0,
+            limit: 200
+          };
+          const reportUrl = `${parseBaseUrl}functions/getReport`;
+          await axios
+            .post(reportUrl, params, {
+              headers: {
+                "Content-Type": "application/json",
+                "X-Parse-Application-Id": parseAppId,
+                sessiontoken: localStorage.getItem("accesstoken")
+              }
+            })
+            .then((res) => {
+              setresponse(res.data?.result?.length ?? 0);
+            });
         } else {
           await axios.get(url, { headers: headers }).then((res) => {
             if (res?.data?.[props.Data.key]) {

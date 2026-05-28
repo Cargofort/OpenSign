@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { cloudServerUrl, serverAppId } from '../../Utils.js';
+import { getCallerOrgContext, listUserIdsInOrg } from './orgScope.js';
 export default async function getDrive(request) {
   const serverUrl = cloudServerUrl; //process.env.SERVER_URL;
   const appId = serverAppId;
@@ -27,7 +28,21 @@ export default async function getDrive(request) {
         } else {
           query.doesNotExist('Folder', true);
         }
-        query.equalTo('CreatedBy', { __type: 'Pointer', className: '_User', objectId: userId });
+        // Widen CreatedBy filter for OrgAdmin
+        const orgCtx = await getCallerOrgContext(userId);
+        if (orgCtx?.role === 'contracts_OrgAdmin' && orgCtx.orgId) {
+          const orgUserIds = await listUserIdsInOrg(orgCtx.orgId);
+          if (orgUserIds.length > 0) {
+            query.containedIn(
+              'CreatedBy',
+              orgUserIds.map(id => ({ __type: 'Pointer', className: '_User', objectId: id }))
+            );
+          } else {
+            query.equalTo('CreatedBy', { __type: 'Pointer', className: '_User', objectId: userId });
+          }
+        } else {
+          query.equalTo('CreatedBy', { __type: 'Pointer', className: '_User', objectId: userId });
+        }
         query.include('ExtUserPtr');
         query.include('ExtUserPtr.TenantId');
         query.include('Signers');

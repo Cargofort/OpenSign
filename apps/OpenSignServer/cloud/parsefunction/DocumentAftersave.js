@@ -1,3 +1,5 @@
+import { listOrgAdminUserIdsForOrg } from './orgScope.js';
+
 async function DocumentAftersave(request) {
   try {
     if (!request.original) {
@@ -105,6 +107,8 @@ async function DocumentAftersave(request) {
       newACL.setWriteAccess(x.objectId, true);
     });
 
+    await grantOrgAdminAcl(res?.CreatedBy?.objectId, newACL);
+
     updateACL.setACL(newACL);
     updateACL.save(null, { useMasterKey: true });
   }
@@ -122,8 +126,39 @@ async function DocumentAftersave(request) {
       newACL.setReadAccess(res?.CreatedBy?.objectId, true);
       newACL.setWriteAccess(res?.CreatedBy?.objectId, true);
     }
+
+    await grantOrgAdminAcl(res?.CreatedBy?.objectId, newACL);
+
     updateACL.setACL(newACL);
     updateACL.save(null, { useMasterKey: true });
+  }
+
+  /**
+   * Looks up the creator's org, finds all OrgAdmins, and grants them read+write on the ACL.
+   * No-op if the creator has no org row or the org has no OrgAdmins.
+   */
+  async function grantOrgAdminAcl(creatorUserId, acl) {
+    if (!creatorUserId) return;
+    try {
+      const extUserQuery = new Parse.Query('contracts_Users');
+      extUserQuery.equalTo('UserId', {
+        __type: 'Pointer',
+        className: '_User',
+        objectId: creatorUserId,
+      });
+      extUserQuery.select('OrganizationId');
+      const extUser = await extUserQuery.first({ useMasterKey: true });
+      const orgPtr = extUser?.get('OrganizationId');
+      const orgId = orgPtr?.id || orgPtr?.objectId;
+      if (!orgId) return;
+      const orgAdminIds = await listOrgAdminUserIdsForOrg(orgId);
+      orgAdminIds.forEach(id => {
+        acl.setReadAccess(id, true);
+        acl.setWriteAccess(id, true);
+      });
+    } catch (e) {
+      console.log('grantOrgAdminAcl error:', e?.message);
+    }
   }
 }
 

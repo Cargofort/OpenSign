@@ -1,5 +1,6 @@
 import { cloudServerUrl, serverAppId } from '../../Utils.js';
 import reportJson, { applySearch } from './reportsJson.js';
+import { getCallerOrgContext, listUserIdsInOrg } from './orgScope.js';
 import axios from 'axios';
 function buildClassesUrl({ serverUrl, clsName, paramsObj, keys, orderBy, skip, limit, include }) {
   const url = new URL(`${serverUrl}/classes/${clsName}`);
@@ -33,7 +34,20 @@ export default async function getReport(request) {
     if (!userId) {
       return { error: 'Invalid session token' };
     }
-    const json = reportId && reportJson(reportId, userId);
+
+    // Resolve OrgAdmin scope: if caller is OrgAdmin, widen CreatedBy to all org members
+    let creatorScope;
+    const orgCtx = await getCallerOrgContext(userId);
+    if (orgCtx?.role === 'contracts_OrgAdmin' && orgCtx.orgId) {
+      const orgUserIds = await listUserIdsInOrg(orgCtx.orgId);
+      if (orgUserIds.length > 0) {
+        creatorScope = {
+          $in: orgUserIds.map(id => ({ __type: 'Pointer', className: '_User', objectId: id })),
+        };
+      }
+    }
+
+    const json = reportId && reportJson(reportId, userId, creatorScope);
     if (json) {
       let paramsObj = { ...(json.params || {}) };
       if (reportId == '6TeaPr321t') {

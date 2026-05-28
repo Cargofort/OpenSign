@@ -1,3 +1,39 @@
+import { listUserIdsInOrg } from './orgScope.js';
+
+/**
+ * Grants read+write ACL on every org document to the newly promoted OrgAdmin.
+ * Run after saving a contracts_Users row with UserRole === 'contracts_OrgAdmin'.
+ */
+async function backfillOrgAdminAcl(newUserId, orgId) {
+  const orgUserIds = await listUserIdsInOrg(orgId);
+  if (orgUserIds.length === 0) return;
+
+  const BATCH = 200;
+  let skip = 0;
+  while (true) {
+    const docQuery = new Parse.Query('contracts_Document');
+    docQuery.containedIn(
+      'CreatedBy',
+      orgUserIds.map(id => ({ __type: 'Pointer', className: '_User', objectId: id }))
+    );
+    docQuery.limit(BATCH);
+    docQuery.skip(skip);
+    const docs = await docQuery.find({ useMasterKey: true });
+    if (docs.length === 0) break;
+    await Promise.all(
+      docs.map(async doc => {
+        const acl = doc.getACL() || new Parse.ACL();
+        acl.setReadAccess(newUserId, true);
+        acl.setWriteAccess(newUserId, true);
+        doc.setACL(acl);
+        await doc.save(null, { useMasterKey: true });
+      })
+    );
+    skip += docs.length;
+    if (docs.length < BATCH) break;
+  }
+}
+
 export default async function addUser(request) {
   const { phone, name, password, organization, team, tenantId, timezone, role } = request.params;
   const email = request.params?.email?.toLowerCase()?.replace(/\s/g, '');
@@ -68,12 +104,18 @@ export default async function addUser(request) {
           extUser.setACL(acl);
           const extUserRes = await extUser.save();
 
+          if (`contracts_${role}` === 'contracts_OrgAdmin' && organization.objectId) {
+            backfillOrgAdminAcl(user.id, organization.objectId).catch(e =>
+              console.log('backfillOrgAdminAcl error:', e?.message)
+            );
+          }
+
           const parseData = JSON.parse(JSON.stringify(extUserRes));
           return parseData;
         }
       } catch (err) {
         console.log('err ', err);
-        if (err.code === 202) {
+        if (err.code === 202 || err.code === 203) {
           const userQuery = new Parse.Query(Parse.User);
           userQuery.equalTo('email', email);
           const userRes = await userQuery.first({ useMasterKey: true });
@@ -89,6 +131,12 @@ export default async function addUser(request) {
 
           extUser.setACL(acl);
           const res = await extUser.save();
+
+          if (`contracts_${role}` === 'contracts_OrgAdmin' && organization.objectId) {
+            backfillOrgAdminAcl(userRes.id, organization.objectId).catch(e =>
+              console.log('backfillOrgAdminAcl error:', e?.message)
+            );
+          }
 
           const parseData = JSON.parse(JSON.stringify(res));
           return parseData;

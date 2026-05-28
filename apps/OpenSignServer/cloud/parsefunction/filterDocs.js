@@ -1,3 +1,5 @@
+import { getCallerOrgContext, listUserIdsInOrg } from './orgScope.js';
+
 /**
  * Escapes special characters in a string so it can safely be used in a RegExp.
  */
@@ -7,7 +9,7 @@ function escapeRegExp(str) {
 
 /**
  * Fetches contracts_Document objects whose Name matches searchTerm
- * and whose CreatedBy pointer is the current user.
+ * and whose CreatedBy pointer is the current user (or any org member for OrgAdmin).
  *
  * @param {Parse.User} user            – the logged-in Parse.User (e.g. request.user)
  * @param {string}     searchTerm      – substring (or full name) to match
@@ -15,11 +17,12 @@ function escapeRegExp(str) {
  * @param {number}     [options.limit=100] – max results
  * @param {number}     [options.skip=0]    – offset for pagination
  * @param {boolean}    [options.caseSensitive=false] – regex case sensitivity
+ * @param {string[]|null} [options.orgUserIds] – if set, filter by containedIn instead of equalTo
  */
 async function fetchDocumentsByName(
   user,
   searchTerm,
-  { limit = 300, skip = 0, caseSensitive = false } = {}
+  { limit = 300, skip = 0, caseSensitive = false, orgUserIds = null } = {}
 ) {
   const query = new Parse.Query('contracts_Document');
 
@@ -30,8 +33,15 @@ async function fetchDocumentsByName(
     query.matches('Name', pattern, caseSensitive ? undefined : 'i');
   }
 
-  // 2) Filter by CreatedBy pointer
-  query.equalTo('CreatedBy', user);
+  // 2) Filter by CreatedBy pointer (widened for OrgAdmin)
+  if (orgUserIds && orgUserIds.length > 0) {
+    query.containedIn(
+      'CreatedBy',
+      orgUserIds.map(id => ({ __type: 'Pointer', className: '_User', objectId: id }))
+    );
+  } else {
+    query.equalTo('CreatedBy', user);
+  }
 
   // 3) Pagination & sorting
   query.limit(limit);
@@ -66,14 +76,20 @@ export default async function filterDocs(request) {
   }
 
   try {
+    let orgUserIds = null;
+    const orgCtx = await getCallerOrgContext(request.user.id);
+    if (orgCtx?.role === 'contracts_OrgAdmin' && orgCtx.orgId) {
+      orgUserIds = await listUserIdsInOrg(orgCtx.orgId);
+    }
+
     const docs = await fetchDocumentsByName(request.user, searchTerm, {
       limit,
       skip,
       caseSensitive,
+      orgUserIds,
     });
     return docs;
   } catch (error) {
-    // handle error
     console.log('err while filtering doc', error);
     throw error;
   }

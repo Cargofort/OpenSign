@@ -1,35 +1,6 @@
 import axios from 'axios';
 import { cloudServerUrl, serverAppId } from '../../Utils.js';
-import { listUserIdsInOrg } from './orgScope.js';
-
-async function backfillOrgAdminAcl(newUserId, orgId) {
-  const orgUserIds = await listUserIdsInOrg(orgId);
-  if (orgUserIds.length === 0) return;
-  const BATCH = 200;
-  let skip = 0;
-  while (true) {
-    const docQuery = new Parse.Query('contracts_Document');
-    docQuery.containedIn(
-      'CreatedBy',
-      orgUserIds.map(id => ({ __type: 'Pointer', className: '_User', objectId: id }))
-    );
-    docQuery.limit(BATCH);
-    docQuery.skip(skip);
-    const docs = await docQuery.find({ useMasterKey: true });
-    if (docs.length === 0) break;
-    await Promise.all(
-      docs.map(async doc => {
-        const acl = doc.getACL() || new Parse.ACL();
-        acl.setReadAccess(newUserId, true);
-        acl.setWriteAccess(newUserId, true);
-        doc.setACL(acl);
-        await doc.save(null, { useMasterKey: true });
-      })
-    );
-    skip += docs.length;
-    if (docs.length < BATCH) break;
-  }
-}
+import { backfillOrgAdminAcl } from './orgScope.js';
 const serverUrl = cloudServerUrl; //process.env.SERVER_URL;
 const APPID = serverAppId;
 const masterKEY = process.env.MASTER_KEY;

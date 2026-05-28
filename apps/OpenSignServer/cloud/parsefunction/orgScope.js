@@ -21,6 +21,7 @@ export async function getCallerOrgContext(userId) {
 
 /**
  * Returns _User objectIds of all contracts_Users in the given org.
+ * Uses query.each() to page through all rows regardless of org size.
  */
 export async function listUserIdsInOrg(orgId) {
   const query = new Parse.Query('contracts_Users');
@@ -30,15 +31,20 @@ export async function listUserIdsInOrg(orgId) {
     objectId: orgId,
   });
   query.select('UserId');
-  query.limit(1000);
-  const results = await query.find({ useMasterKey: true });
-  return results
-    .map(r => r.get('UserId')?.id || r.get('UserId')?.objectId)
-    .filter(Boolean);
+  const ids = [];
+  await query.each(
+    r => {
+      const id = r.get('UserId')?.id || r.get('UserId')?.objectId;
+      if (id) ids.push(id);
+    },
+    { useMasterKey: true, batchSize: 1000 }
+  );
+  return [...new Set(ids)];
 }
 
 /**
  * Returns _User objectIds of OrgAdmin contracts_Users in the given org.
+ * Uses query.each() to page through all rows regardless of org size.
  */
 export async function listOrgAdminUserIdsForOrg(orgId) {
   const query = new Parse.Query('contracts_Users');
@@ -49,9 +55,46 @@ export async function listOrgAdminUserIdsForOrg(orgId) {
   });
   query.equalTo('UserRole', 'contracts_OrgAdmin');
   query.select('UserId');
-  query.limit(1000);
-  const results = await query.find({ useMasterKey: true });
-  return results
-    .map(r => r.get('UserId')?.id || r.get('UserId')?.objectId)
-    .filter(Boolean);
+  const ids = [];
+  await query.each(
+    r => {
+      const id = r.get('UserId')?.id || r.get('UserId')?.objectId;
+      if (id) ids.push(id);
+    },
+    { useMasterKey: true, batchSize: 1000 }
+  );
+  return [...new Set(ids)];
+}
+
+/**
+ * Grants read+write ACL on every org document to a newly promoted OrgAdmin.
+ * Paginates through all documents; call fire-and-forget from addUser/usersignup.
+ */
+export async function backfillOrgAdminAcl(newUserId, orgId) {
+  const orgUserIds = await listUserIdsInOrg(orgId);
+  if (orgUserIds.length === 0) return;
+  const BATCH = 200;
+  let skip = 0;
+  while (true) {
+    const docQuery = new Parse.Query('contracts_Document');
+    docQuery.containedIn(
+      'CreatedBy',
+      orgUserIds.map(id => ({ __type: 'Pointer', className: '_User', objectId: id }))
+    );
+    docQuery.limit(BATCH);
+    docQuery.skip(skip);
+    const docs = await docQuery.find({ useMasterKey: true });
+    if (docs.length === 0) break;
+    await Promise.all(
+      docs.map(async doc => {
+        const acl = doc.getACL() || new Parse.ACL();
+        acl.setReadAccess(newUserId, true);
+        acl.setWriteAccess(newUserId, true);
+        doc.setACL(acl);
+        await doc.save(null, { useMasterKey: true });
+      })
+    );
+    skip += docs.length;
+    if (docs.length < BATCH) break;
+  }
 }

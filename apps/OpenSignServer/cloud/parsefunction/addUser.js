@@ -1,38 +1,4 @@
-import { listUserIdsInOrg } from './orgScope.js';
-
-/**
- * Grants read+write ACL on every org document to the newly promoted OrgAdmin.
- * Run after saving a contracts_Users row with UserRole === 'contracts_OrgAdmin'.
- */
-async function backfillOrgAdminAcl(newUserId, orgId) {
-  const orgUserIds = await listUserIdsInOrg(orgId);
-  if (orgUserIds.length === 0) return;
-
-  const BATCH = 200;
-  let skip = 0;
-  while (true) {
-    const docQuery = new Parse.Query('contracts_Document');
-    docQuery.containedIn(
-      'CreatedBy',
-      orgUserIds.map(id => ({ __type: 'Pointer', className: '_User', objectId: id }))
-    );
-    docQuery.limit(BATCH);
-    docQuery.skip(skip);
-    const docs = await docQuery.find({ useMasterKey: true });
-    if (docs.length === 0) break;
-    await Promise.all(
-      docs.map(async doc => {
-        const acl = doc.getACL() || new Parse.ACL();
-        acl.setReadAccess(newUserId, true);
-        acl.setWriteAccess(newUserId, true);
-        doc.setACL(acl);
-        await doc.save(null, { useMasterKey: true });
-      })
-    );
-    skip += docs.length;
-    if (docs.length < BATCH) break;
-  }
-}
+import { backfillOrgAdminAcl } from './orgScope.js';
 
 export default async function addUser(request) {
   const { phone, name, password, organization, team, tenantId, timezone, role } = request.params;
@@ -119,8 +85,14 @@ export default async function addUser(request) {
           const userQuery = new Parse.Query(Parse.User);
           userQuery.equalTo('email', email);
           const userRes = await userQuery.first({ useMasterKey: true });
-          userRes.setPassword(password);
-          await userRes.save(null, { useMasterKey: true });
+          if (!userRes) throw new Parse.Error(400, err?.message || 'User not found.');
+          if (err.code === 202) {
+            // Username taken on re-invite: reset to the caller-supplied password
+            userRes.setPassword(password);
+            await userRes.save(null, { useMasterKey: true });
+          }
+          // code 203: email already belongs to an existing account — use it as-is,
+          // do NOT reset their password (would be an account-takeover vector).
           extUser.set('CreatedBy', currentUser);
           extUser.set('UserId', { __type: 'Pointer', className: '_User', objectId: userRes.id });
           const acl = new Parse.ACL();

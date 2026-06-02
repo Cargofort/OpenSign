@@ -364,6 +364,7 @@ function Login() {
       const name = ssoUserinfo.name || userInformation.name || userInformation.username || email;
       if (payload && payload.sessionToken && email) {
         try {
+          const ssoAccessToken = sessionStorage.getItem("sso_access_token") || undefined;
           const params = {
             userDetails: {
               name,
@@ -374,7 +375,8 @@ function Login() {
               jobTitle: userDetails.Destination,
               timezone: usertimezone
             },
-            isSsoSignup: true
+            isSsoSignup: true,
+            ...(ssoAccessToken && { ssoAccessToken })
           };
           const userSignUp = await Parse.Cloud.run("usersignup", params);
           if (userSignUp && userSignUp.sessionToken) {
@@ -387,6 +389,7 @@ function Login() {
             };
             localStorage.setItem("userDetails", JSON.stringify(LocalUserDetails));
             localStorage.removeItem("sso_userinfo");
+            sessionStorage.removeItem("sso_access_token");
             await thirdpartyLoginfn(userSignUp.sessionToken);
           } else {
             showToast("danger", userSignUp?.message || t("something-went-wrong-mssg"));

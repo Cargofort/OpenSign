@@ -86,22 +86,22 @@ async function saveUser(userDetails, request) {
 function mapSsoRoleToOpenSign(rawRole) {
   const role = typeof rawRole === 'string' ? rawRole.trim().toLowerCase() : '';
   if (role === 'editor' || role === 'contracts_editor') return 'contracts_Editor';
-  if (
-    role === 'orgadmin' || 
-    role === 'org_admin' || 
-    role === 'contracts_orgadmin' || 
-    role === 'admin'
-  )
-    return 'contracts_Admin';
+  if (role === 'admin' || role === 'contracts_admin') return 'contracts_Admin';
+  if (role === 'orgadmin' || role === 'org_admin' || role === 'contracts_orgadmin') return 'contracts_OrgAdmin';
   return 'contracts_User';
 }
 
 async function resolveSsoRole(request) {
   const fallbackRole = 'contracts_User';
-  if (!request.params.isSsoSignup || !request?.user) return fallbackRole;
+  if (!request.params.isSsoSignup) return fallbackRole;
   try {
-    const authData = request.user.get('authData') || {};
-    const accessToken = authData?.sso?.access_token;
+    // Prefer the token passed explicitly from the frontend (authData is not exposed in cloud functions).
+    // Fall back to authData in case it is available (e.g. future Parse Server versions).
+    let accessToken = request.params.ssoAccessToken;
+    if (!accessToken && request?.user) {
+      const authData = request.user.get('authData') || {};
+      accessToken = authData?.sso?.access_token;
+    }
     if (!accessToken) return fallbackRole;
     const userinfoUrl = ssoApiUrl.replace(/\/$/, '') + ssoUserinfoPath;
     const response = await axios.get(userinfoUrl, {

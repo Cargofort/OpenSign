@@ -64,7 +64,7 @@ export default async function savecontact(request) {
         }
       } catch (err) {
         console.log('err ', err);
-        if (err.code === 202) {
+        if (err.code === 202 || err.code === 203) {
           const params = { email: email };
           const userRes = await Parse.Cloud.run('getUserId', params);
           contactQuery.set('CreatedBy', currentUserPtr);

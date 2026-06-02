@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { cloudServerUrl, serverAppId } from '../../Utils.js';
+import { backfillOrgAdminAcl } from './orgScope.js';
 const serverUrl = cloudServerUrl; //process.env.SERVER_URL;
 const APPID = serverAppId;
 const masterKEY = process.env.MASTER_KEY;
@@ -270,6 +271,16 @@ export default async function usersignup(request) {
           { __type: 'Pointer', className: 'contracts_Teams', objectId: teamRes.id },
         ]);
         await newObj.save(null, { useMasterKey: true });
+      }
+
+      // Backfill ACL for existing org docs when a new OrgAdmin joins
+      if (effectiveRole === 'contracts_OrgAdmin') {
+        const resolvedOrgId = existing ? existing.org.id : null;
+        if (resolvedOrgId) {
+          backfillOrgAdminAcl(user.id, resolvedOrgId).catch(e =>
+            console.log('backfillOrgAdminAcl error:', e?.message)
+          );
+        }
       }
 
       // Update Parse _User with email/name so profile displays correctly (SSO users often lack these)

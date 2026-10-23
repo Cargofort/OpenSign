@@ -104,19 +104,20 @@ make ssh                # Shell into the server container
 ```bash
 docker compose exec client npm run dev
 docker compose exec client npm run build
-docker compose exec client npm test
-docker compose exec client npm run test:watch
 ```
+The frontend has no test suite (upstream v3 removed vitest).
 
 ### Backend (`apps/OpenSignServer/`)
 ```bash
 docker compose exec server npm start
 docker compose exec server npm run watch
+docker compose exec server npx jasmine --config=spec/support/jasmine.metadata.json  # unit specs, no DB
 docker compose exec server npm test
 docker compose exec server npm run coverage
 docker compose exec server npm run lint
 docker compose exec server npm run lint-fix
 ```
+New unit specs must be listed in `spec/support/jasmine.metadata.json`. `npm test` runs every spec against a Parse Server and needs MongoDB (`MONGODB_URI`); the legacy `spec/Tests.spec.js` examples fail there. `npm run lint` currently fails because ESLint 9 needs a flat config (`eslint.config.js`).
 
 ### Root
 ```bash

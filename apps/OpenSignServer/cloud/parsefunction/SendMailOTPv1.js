@@ -1,4 +1,5 @@
-import { appName, formatFromHeader, getResolvedMailSender, smtpenable, updateMailCount } from '../../Utils.js';
+import { formatFromHeader, getResolvedMailSender, smtpenable, updateMailCount } from '../../Utils.js';
+import { escapeHtml, resolveBrandContext } from '../../utils/brandContext.js';
 async function getDocument(docId) {
   try {
     const query = new Parse.Query('contracts_Document');
@@ -12,7 +13,7 @@ async function getDocument(docId) {
     query.notEqualTo('IsArchive', true);
     const res = await query.first({ useMasterKey: true });
     const _res = res?.toJSON();
-    return _res?.ExtUserPtr?.objectId;
+    return _res?.ExtUserPtr;
   } catch (err) {
     console.log('err ', err);
   }
@@ -22,26 +23,27 @@ async function sendMailOTPv1(request) {
     let code = Math.floor(1000 + Math.random() * 9000);
     let email = request.params.email;
     let TenantId = request.params.TenantId ? request.params.TenantId : undefined;
-    const AppName = appName;
+    const documentOwner = request.params?.docId
+      ? await getDocument(request.params.docId)
+      : undefined;
+    const brand = resolveBrandContext({});
+    const AppName = brand.productName;
 
     if (email) {
       const recipient = request.params.email;
       const senderEmail = getResolvedMailSender({ isSmtp: smtpenable });
       try {
         await Parse.Cloud.sendEmail({
-          sender: formatFromHeader(AppName, senderEmail),
+          sender: formatFromHeader(brand.senderName, senderEmail),
           recipient: recipient,
           subject: `Your ${AppName} OTP`,
           text: 'otp email',
           html:
-            `<p>Your OTP for ${AppName} verification is:</p><p style='font-weight:bolder;color:#2563eb;font-size:32px;margin:16px 0;'>${code}</p>`,
+            `<p>Your OTP for ${escapeHtml(AppName)} verification is:</p><p style='font-weight:bolder;color:#2563eb;font-size:32px;margin:16px 0;'>${code}</p>`,
         });
         console.log('OTP sent', code);
-        if (request.params?.docId) {
-          const extUserId = await getDocument(request.params?.docId);
-          if (extUserId) {
-            updateMailCount(extUserId);
-          }
+        if (documentOwner?.objectId) {
+          updateMailCount(documentOwner.objectId);
         }
       } catch (err) {
         console.log('error in send OTP mail', err);

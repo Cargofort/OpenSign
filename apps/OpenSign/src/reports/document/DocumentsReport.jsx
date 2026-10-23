@@ -417,7 +417,7 @@ const DocumentsReport = (props) => {
     );
     const urls = removePrefill?.map((x) => ({
       email: getSignerEmail(x, item?.Signers) || x.email || "-",
-      url: getUrl(x)
+      url: getUrl(x),
     }));
     setShareUrls(urls);
     setIsShare({ [item.objectId]: true });
@@ -1015,7 +1015,7 @@ const DocumentsReport = (props) => {
       let signPdf = `${hostUrl}/login/${encodeBase64}`;
       shareLinkList.push({
         signerEmail: signerMail[i].Email,
-        url: signPdf
+        url: signPdf,
       });
     }
     return shareLinkList.map((data, ind) => {
@@ -1109,15 +1109,16 @@ const DocumentsReport = (props) => {
                   onChange={props.handleSearchChange}
                   placeholder={t("search-documents")}
                   onPaste={props.handleSearchPaste}
-                  className="op-input op-input-bordered op-input-sm focus:outline-none hover:border-base-content w-64 text-xs"
+                  className="os-report-search op-input op-input-bordered op-input-sm hover:border-base-content w-64 text-xs"
                 />
               </div>
             )}
             {/* search icon/magnifer icon  */}
             {titleElement?.width < 500 && (
               <button
-                className="flex justify-center items-center focus:outline-none rounded-md text-[18px]"
-                aria-label="Search"
+                type="button"
+                className="flex min-h-[44px] min-w-[44px] justify-center items-center rounded-md text-[18px]"
+                aria-label={t("search")}
                 onClick={() =>
                   props.setMobileSearchOpen(!props.mobileSearchOpen)
                 }
@@ -1127,8 +1128,9 @@ const DocumentsReport = (props) => {
             )}
             {props.openColumnModal && (
               <button
-                className="flex justify-center items-center focus:outline-none rounded-md text-[18px]"
-                aria-label="Columns"
+                type="button"
+                className="flex min-h-[44px] min-w-[44px] justify-center items-center rounded-md text-[18px]"
+                aria-label={t("columns")}
                 onClick={props.openColumnModal}
               >
                 <i className="fa-light fa-table-columns"></i>
@@ -1136,16 +1138,17 @@ const DocumentsReport = (props) => {
             )}
             {props?.ReportName === "In-progress documents" && (
               <div className="op-dropdown op-dropdown-end">
-                <div
+                <button
+                  type="button"
+                  aria-label={t("options")}
                   tabIndex={0}
-                  role="button"
-                  className="focus:outline-none rounded-md text-[18px]"
+                  className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-md text-[18px]"
                 >
                   <i className="fa-light fa-filter"></i>
-                </div>
+                </button>
                 <ul
                   tabIndex="-1"
-                  className="op-dropdown-content op-menu op-menu-sm shadow-black/20 bg-base-100 text-base-content rounded-box z-[70] w-52 p-2 shadow-sm"
+                  className="op-dropdown-content op-menu op-menu-sm shadow-black/20 bg-base-100 text-base-content rounded-box z-[600] w-52 p-2 shadow-sm"
                 >
                   <li onClick={() => props.handleSignerStatusFilter("all")}>
                     <a>{t("all-signer-status")}</a>
@@ -1170,12 +1173,15 @@ const DocumentsReport = (props) => {
               onChange={props.handleSearchChange}
               placeholder={t("search-documents")}
               onPaste={props.handleSearchPaste}
-              className="op-input op-input-bordered op-input-sm focus:outline-none hover:border-base-content w-full text-xs"
+              className="os-report-search op-input op-input-bordered op-input-sm hover:border-base-content w-full text-xs"
             />
           </div>
         )}
         <div
-          className={`overflow-auto w-full border-b ${
+          role="region"
+          aria-label={t("documents")}
+          tabIndex={0}
+          className={`os-report-table-wrap overflow-auto w-full border-b ${
             props.List?.length > 0
               ? isDashboard
                 ? "min-h-[317px]"
@@ -1236,13 +1242,24 @@ const DocumentsReport = (props) => {
                                 <div
                                   data-dropdown-root="1"
                                   role="button"
+                                  tabIndex={0}
+                                  aria-label={t(`btnLabel.${act.hoverLabel}`)}
                                   data-tut={act?.selector}
                                   onClick={() => handleActionBtn(act, item)}
+                                  onKeyDown={(event) => {
+                                    if (
+                                      event.key === "Enter" ||
+                                      event.key === " "
+                                    ) {
+                                      event.preventDefault();
+                                      handleActionBtn(act, item);
+                                    }
+                                  }}
                                   title={t(`btnLabel.${act.hoverLabel}`)}
                                   className={
                                     act.action !== "option"
-                                      ? `${act?.btnColor || ""} op-btn op-btn-sm mr-1`
-                                      : "text-base-content focus:outline-none text-lg mr-2 relative"
+                                      ? `${act?.btnColor || ""} op-btn op-btn-sm min-h-[44px] min-w-[44px] mr-1`
+                                      : "text-base-content text-lg mr-2 relative flex min-h-[44px] min-w-[44px] items-center justify-center"
                                   }
                                 >
                                   <i className={act.btnIcon}></i>
@@ -1254,20 +1271,24 @@ const DocumentsReport = (props) => {
                                   {/* doc report */}
                                   {isOption[item.objectId] &&
                                     act.action === "option" && (
-                                      <ul className="absolute -right-1 top-auto z-[70] w-max op-dropdown-content op-menu op-menu-sm shadow-black/20 shadow bg-base-100 text-base-content rounded-box">
+                                      <ul className="absolute -right-1 top-full z-[600] w-max op-dropdown-content op-menu op-menu-sm shadow-black/20 shadow bg-base-100 text-base-content rounded-box">
                                         {act.subaction?.map(
                                           (subact) =>
                                             !restrictBtn(item, subact) && (
-                                              <li
-                                                key={subact.btnId}
-                                                onClick={() =>
-                                                  handleActionBtn(subact, item)
-                                                }
-                                                title={t(
-                                                  `btnLabel.${subact.hoverLabel}`
-                                                )}
-                                              >
-                                                <span>
+                                              <li key={subact.btnId}>
+                                                <button
+                                                  type="button"
+                                                  className="w-full text-left"
+                                                  onClick={() =>
+                                                    handleActionBtn(
+                                                      subact,
+                                                      item
+                                                    )
+                                                  }
+                                                  title={t(
+                                                    `btnLabel.${subact.hoverLabel}`
+                                                  )}
+                                                >
                                                   <i
                                                     className={`${subact.btnIcon} mr-1.5`}
                                                   ></i>
@@ -1278,7 +1299,7 @@ const DocumentsReport = (props) => {
                                                       )}
                                                     </span>
                                                   )}
-                                                </span>
+                                                </button>
                                               </li>
                                             )
                                         )}
@@ -1317,13 +1338,13 @@ const DocumentsReport = (props) => {
                               <div className="flex items-center justify-center mt-[14px] md:mt-[16px] gap-2 text-white">
                                 <button
                                   onClick={() => handleRecreateDoc(item)}
-                                  className="op-btn op-btn-primary focus:outline-none text-sm relative px-4"
+                                  className="op-btn op-btn-primary text-sm relative px-4"
                                 >
                                   {t("start-editing")}
                                 </button>
                                 <button
                                   onClick={handleCloseModal}
-                                  className="op-btn op-btn-secondary focus:outline-none text-sm relative px-8"
+                                  className="op-btn op-btn-secondary text-sm relative px-8"
                                 >
                                   {t("cancel")}
                                 </button>
@@ -1349,7 +1370,7 @@ const DocumentsReport = (props) => {
                               </p>
                               <div className="flex flex-wrap gap-1 items-center justify-center mt-2">
                                 <button
-                                  className="op-btn-primary op-btn op-btn-sm focus:outline-none text-sm relative"
+                                  className="op-btn-primary op-btn op-btn-sm text-sm relative"
                                   onClick={() =>
                                     handleUseTemplate(templateId, item)
                                   }
@@ -1358,7 +1379,7 @@ const DocumentsReport = (props) => {
                                   {t("btnLabel.Use")}
                                 </button>
                                 <button
-                                  className="op-btn-secondary op-btn op-btn-sm focus:outline-none text-sm relative"
+                                  className="op-btn-secondary op-btn op-btn-sm text-sm relative"
                                   onClick={() =>
                                     handleBulkSendTemplate(
                                       templateId,
@@ -1372,7 +1393,7 @@ const DocumentsReport = (props) => {
                                   }
                                 </button>
                                 <button
-                                  className="op-btn-secondary op-btn op-btn-sm focus:outline-none text-sm relative"
+                                  className="op-btn-secondary op-btn op-btn-sm text-sm relative"
                                   onClick={() =>
                                     navigate(`/template/${templateId}`)
                                   }
@@ -1620,7 +1641,7 @@ const DocumentsReport = (props) => {
                               <textarea
                                 rows={3}
                                 placeholder="Reason (optional)"
-                                className="px-4 op-textarea op-textarea-bordered text-base-content focus:outline-none hover:border-base-content w-full text-xs"
+                                className="px-4 op-textarea op-textarea-bordered text-base-content hover:border-base-content w-full text-xs"
                                 value={reason}
                                 onChange={(e) => setReason(e.target.value)}
                               ></textarea>
@@ -1684,7 +1705,7 @@ const DocumentsReport = (props) => {
                                             </label>
                                             <input
                                               id="mailsubject"
-                                              className="op-input op-input-bordered op-input-sm focus:outline-none hover:border-base-content w-full text-xs"
+                                              className="op-input op-input-bordered op-input-sm hover:border-base-content w-full text-xs"
                                               value={mail.subject}
                                               onChange={(e) =>
                                                 handleSubjectChange(
@@ -1772,7 +1793,7 @@ const DocumentsReport = (props) => {
                               type="text"
                               defaultValue={renameDoc || item.Name}
                               onChange={(e) => setRenameDoc(e.target.value)}
-                              className="op-input op-input-bordered op-input-sm w-full focus:outline-none hover:border-base-content text-[10px]"
+                              className="op-input op-input-bordered op-input-sm w-full hover:border-base-content text-[10px]"
                             />
                           </div>
                           <div className="flex flex-row gap-2 pt-3 mt-3 border-t-[1.5px] border-gray-500">
@@ -1807,8 +1828,8 @@ const DocumentsReport = (props) => {
           {(props.searchLoader || props.List?.length <= 0) && (
             <div
               className={`${
-                isDashboard ? "h-[317px]" : ""
-              } flex flex-col items-center justify-center w-ful bg-base-100 text-base-content rounded-xl py-4`}
+                isDashboard ? "min-h-[148px] md:min-h-[317px]" : ""
+              } flex flex-col items-center justify-center w-full bg-base-100 text-base-content rounded-xl py-4`}
             >
               {props.searchLoader ? (
                 <>

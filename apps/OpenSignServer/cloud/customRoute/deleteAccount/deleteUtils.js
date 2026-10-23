@@ -1,5 +1,5 @@
-import { appName } from '../../../Utils.js';
 import sendSystemMail from '../../parsefunction/sendSystemMail.js';
+import { resolveBrandContext } from '../../../utils/brandContext.js';
 
 // Constants (adjust to your preference)
 export const OTP_LENGTH = 6;
@@ -15,9 +15,10 @@ export function generateOtp(len = OTP_LENGTH) {
 
 export async function sendDeleteOtpEmail(extUser, otp) {
   const _extUser = extUser && JSON.parse(JSON.stringify(extUser));
+  const brand = resolveBrandContext({});
   const params = {
     extUserId: extUser.id,
-    from: appName,
+    from: brand.senderName,
     recipient: extUser?.get('Email'),
     subject: 'OTP for Deletion account request',
     applyBranding: true,

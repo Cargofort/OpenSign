@@ -1,5 +1,5 @@
-import { appName } from '../../Utils.js';
 import sendMailWithAttachment from './sendMailWithAttachment.js';
+import { escapeHtml, resolveBrandContext } from '../../utils/brandContext.js';
 
 export default async function forwardDoc(request) {
   try {
@@ -27,7 +27,8 @@ export default async function forwardDoc(request) {
       const _docRes = docRes?.toJSON();
       const docName = _docRes.Name;
       const extUserId = _docRes?.ExtUserPtr?.objectId;
-      const TenantAppName = appName;
+      const brand = resolveBrandContext({});
+      const TenantAppName = brand.productName;
       const from = _docRes?.SenderName || _docRes?.ExtUserPtr?.Email;
       const replyTo = _docRes?.SenderMail || _docRes?.ExtUserPtr?.Email;
       const senderName = _docRes?.SenderName || _docRes?.ExtUserPtr?.Name;
@@ -44,7 +45,7 @@ export default async function forwardDoc(request) {
             replyto: replyTo || '',
             from: from,
             html:
-              `<p>A copy of the document <strong>${docName}</strong> is attached to this email. Kindly download the document from the attachment.</p>`,
+              `<p>A copy of the document <strong>${escapeHtml(docName)}</strong> is attached to this email. Kindly download the document from the attachment.</p>`,
             applyBranding: true,
             brandingHeader: 'Document Copy',
             brandingFooter: `This is an automated email from ${TenantAppName}. For any queries, please contact ${replyTo} directly.`,

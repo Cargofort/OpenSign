@@ -2,7 +2,10 @@
   "spec_dir": "spec",
   "spec_files": [
     "createBatchDocs.mailSender.spec.js",
-    "sdkSignRequests.metadata.spec.js"
+    "sdkSignRequests.metadata.spec.js",
+    "ssoAuthAdapter.spec.js",
+    "emailBranding.spec.js",
+    "webhook.spec.js"
   ],
   "helpers": ["helpers/parseInit.js"],
   "stopSpecOnExpectationFailure": false,

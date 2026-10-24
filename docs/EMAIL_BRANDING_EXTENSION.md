@@ -14,10 +14,11 @@ This document describes how global email branding (logo, colors, footer, wrapper
 | Document signed (completion) | PDF.js sendCompletedMail → sendmailv3 | ✅ Branded |
 | Resend request (Documents/Templates) | DocumentsReport, TemplatesReport → sendmailv3 | ✅ Branded |
 | Initial request from UI | PdfRequestFiles, Utils → sendmailv3 | ✅ Branded |
-| Document declined | declinedocument → sendmailv3 | ✅ Branded |
+| Document declined | declinedocument → sendSystemMail | ✅ Branded |
 | Document forwarded (copy) | ForwardDoc → sendmailv3 | ✅ Branded |
-| Signer-signed notification | PDF.js sendNotifyMail → sendmailv3 | ✅ Branded |
-| Delete account OTP | deleteUtils → sendmailv3 | ✅ Branded |
+| Signer-signed notification | PDF.js sendNotifyMail → sendSystemMail | ✅ Branded |
+| Delete account OTP | deleteUtils → sendSystemMail | ✅ Branded |
+| Bulk send summary (to owner) | createBatchDocs → sendSystemMail | — Not branded |
 | OTP verification | SendMailOTPv1 → Parse.Cloud.sendEmail → adapter | ✅ Branded |
 | Delete user request | sendDeleteUserMail → Parse.Cloud.sendEmail → adapter | ✅ Branded |
 | Password reset | Parse Server → adapter (templates) | ✅ Branded |
@@ -36,8 +37,12 @@ This document describes how global email branding (logo, colors, footer, wrapper
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                                                                             │
 │  1. sendmailv3 (HTTP)                                                        │
-│     ├── createBatchDocs, PDF.js, ForwardDoc, declinedocument, deleteUtils   │
+│     ├── createBatchDocs, PDF.js, ForwardDoc                                 │
 │     ├── Frontend: DocumentsReport, TemplatesReport, PdfRequestFiles, Utils  │
+│     └── Branding: req.params.applyBranding → renderBrandedEmailHtml()       │
+│                                                                             │
+│  1b. sendSystemMail (direct call)                                           │
+│     ├── declinedocument, PDF.js sendNotifyMail, deleteUtils, createBatchDocs│
 │     └── Branding: req.params.applyBranding → renderBrandedEmailHtml()       │
 │                                                                             │
 │  2. Parse.Cloud.sendEmail → emailAdapter                                    │
@@ -62,12 +67,29 @@ Header text is **not configurable** globally — each email type passes its own 
 
 ---
 
+## Upstream v3 Brand Context
+
+Upstream v3 resolves product name, sender name, logo and colors from `APP_*` env vars (`apps/OpenSignServer/utils/brandContext.js`). Global branding sits on top of it via `resolveGlobalBrandContext()` in `Utils.js`:
+
+| Value | Source |
+|-------|--------|
+| `__APP_NAME__`, email sender display name | `APP_NAME` / `APP_EMAIL_SENDER_NAME` (default `OpenSign™`) |
+| Logo, primary color, footer, wrapper | `partners_GlobalSettings` (`Key: email_branding`), falling back to `APP_EMAIL_LOGO_URL` / `APP_EMAIL_ACCENT_COLOR`, then OpenSign defaults |
+| Completion certificate logo / color | Saved global logo / primary color; upstream's certificate defaults until an admin saves branding. Only PNG/JPEG logos can be embedded. |
+
+Upstream's renderers (`renderDocumentEmail`, `renderEmailLogo`, etc.) are not used for our emails — bodies are plain HTML and the wrapper adds logo, header and footer, so the logo appears once.
+
+Upstream's complaint footer (`renderComplaintFooter`, linking to complaints@opensignlabs.com) is intentionally not appended to any email. The delete-account email shows a support contact only when `APP_SUPPORT_EMAIL` is set.
+
+---
+
 ## File Summary
 
 | File | Role |
 |------|------|
-| `Utils.js` | `renderBrandedEmailHtml`, `getEmailBrandingConfig` |
-| `sendMailv3.js` | Applies branding when `applyBranding: true` |
+| `Utils.js` | `renderBrandedEmailHtml`, `getEmailBrandingConfig`, `resolveGlobalBrandContext` |
+| `sendMailv3.js`, `sendSystemMail.js` | Apply branding when `applyBranding: true` |
+| `pdf/GenerateCertificate.js` | Uses `resolveGlobalBrandContext` for certificate logo/color |
 | `index.js` | Adapter apiCallback brands all Parse.Cloud.sendEmail + built-in emails |
 | `email_brand_wrapper.html` | Default wrapper template |
 | `declinedocument.js`, `ForwardDoc.js`, `pdf/PDF.js`, `deleteUtils.js` | Pass applyBranding + brandingFooter |
@@ -88,6 +110,9 @@ After implementation, verify:
 - [ ] Delete user request — branding visible
 - [ ] Password reset — branding visible
 - [ ] Email verification — branding visible
+- [ ] Completion certificate — saved logo/color applied
+
+Automated coverage: `apps/OpenSignServer/spec/emailBranding.spec.js` (run with `npx jasmine --config=spec/support/jasmine.metadata.json` in the server container).
 
 ---
 

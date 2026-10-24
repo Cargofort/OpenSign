@@ -1,9 +1,10 @@
-import { appName } from '../../Utils.js';
 import sendSystemMail from './sendSystemMail.js';
+import { escapeHtml, resolveBrandContext } from '../../utils/brandContext.js';
 
 async function sendDeclineMail(doc, publicUrl, userId, reason) {
   try {
-    const TenantAppName = appName;
+    const brand = resolveBrandContext({});
+    const TenantAppName = brand.productName;
     const removePrefill =
       doc?.Placeholders?.length > 0 && doc?.Placeholders?.filter(x => x?.Role !== 'prefill');
     const signUser =
@@ -19,14 +20,14 @@ async function sendDeclineMail(doc, publicUrl, userId, reason) {
     const viewDocUrl = `${publicUrl}/recipientSignPdf/${doc.objectId}`;
     const subject = `Document "${pdfName}" has been declined by ${signerName}`;
     const body =
-      `<p>Dear ${creatorName},</p>` +
-      `<p>${pdfName} has been declined by ${signerName} "${signerEmail}" on ${new Date().toLocaleDateString()}.</p>` +
-      `<p>Decline Reason: ${reason || 'Not specified'}</p>` +
-      `<p><a href="${viewDocUrl}" target="_blank">View Document</a></p>`;
+      `<p>Dear ${escapeHtml(creatorName)},</p>` +
+      `<p>${escapeHtml(pdfName)} has been declined by ${escapeHtml(signerName)} "${escapeHtml(signerEmail)}" on ${new Date().toLocaleDateString()}.</p>` +
+      `<p>Decline Reason: ${escapeHtml(reason || 'Not specified')}</p>` +
+      `<p><a href="${escapeHtml(viewDocUrl)}" target="_blank">View Document</a></p>`;
 
     const params = {
       extUserId: sender.objectId,
-      from: TenantAppName,
+      from: brand.senderName,
       recipient: creatorEmail,
       subject: subject,
       pdfName: pdfName,
@@ -45,7 +46,7 @@ export default async function declinedocument(request) {
   const reason = request.params?.reason || '';
   const userId = request.params.userId;
   const declineBy = { __type: 'Pointer', className: '_User', objectId: userId };
-  const publicUrl = request.headers.public_url;
+  let publicUrl = request.headers.public_url;
   if (!docId) {
     throw new Parse.Error(Parse.Error.SCRIPT_FAILED, 'missing parameter docId.');
   }

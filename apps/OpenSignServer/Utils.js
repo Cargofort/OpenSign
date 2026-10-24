@@ -13,6 +13,7 @@ import {
   PDFDict,
 } from 'pdf-lib';
 import { parseUploadFile } from './utils/fileUtils.js';
+import { escapeHtml, resolveBrandContext, resolveDeploymentBrand } from './utils/brandContext.js';
 
 dotenv.config({ quiet: true });
 
@@ -120,11 +121,16 @@ export const getDefaultEmailBrandingTemplate = () => {
   }
 };
 
-export const getDefaultEmailBrandingConfig = () => ({
-  ...defaultBranding,
-  footerText: `This is an automated email from ${appName}.`,
-  wrapperHtml: getDefaultEmailBrandingTemplate(),
-});
+export const getDefaultEmailBrandingConfig = () => {
+  const deployment = resolveDeploymentBrand();
+  return {
+    ...defaultBranding,
+    logoUrl: deployment.assets.emailLogoUrl || defaultBranding.logoUrl,
+    primaryColor: deployment.colors.emailAccent || defaultBranding.primaryColor,
+    footerText: `This is an automated email from ${deployment.productName}.`,
+    wrapperHtml: getDefaultEmailBrandingTemplate(),
+  };
+};
 
 export const sanitizeEmailBrandingPayload = details => {
   const safeDetails = details && typeof details === 'object' ? details : {};
@@ -147,37 +153,69 @@ const normalizeEmailBody = html => {
 
 const cleanPlainText = value => toStringSafe(value).replace(brandingTokenRegex, '');
 
-export const getEmailBrandingConfig = async () => {
-  const fallback = getDefaultEmailBrandingConfig();
+const getStoredEmailBranding = async () => {
   try {
     const query = new Parse.Query(EMAIL_BRANDING_CLASS_NAME);
     query.equalTo('Key', EMAIL_BRANDING_SETTINGS_KEY);
     const existing = await query.first({ useMasterKey: true });
-    if (!existing) {
-      return fallback;
-    }
-    const config = existing.toJSON?.() || {};
-    return sanitizeEmailBrandingPayload({
-      logoUrl: config.logoUrl,
-      primaryColor: config.primaryColor,
-      footerText: config.footerText,
-      wrapperHtml: config.wrapperHtml,
-    });
+    return existing ? existing.toJSON?.() || {} : null;
   } catch (err) {
-    return fallback;
+    return null;
   }
 };
 
+const toEmailBrandingConfig = stored => {
+  if (!stored) {
+    return getDefaultEmailBrandingConfig();
+  }
+  return sanitizeEmailBrandingPayload({
+    logoUrl: stored.logoUrl,
+    primaryColor: stored.primaryColor,
+    footerText: stored.footerText,
+    wrapperHtml: stored.wrapperHtml,
+  });
+};
+
+export const getEmailBrandingConfig = async () => toEmailBrandingConfig(await getStoredEmailBranding());
+
+// Upstream brand context with the admin-configured partners_GlobalSettings branding applied on top.
+// Certificates only pick up the logo/color once an admin has saved them, so unconfigured
+// deployments keep upstream's certificate look.
+export const resolveGlobalBrandContext = async () => {
+  const brand = resolveBrandContext({});
+  const stored = await getStoredEmailBranding();
+  const branding = toEmailBrandingConfig(stored);
+  const storedLogo = toStringSafe(stored?.logoUrl);
+  const storedColor = toStringSafe(stored?.primaryColor) ? branding.primaryColor : '';
+  return {
+    ...brand,
+    assets: {
+      ...brand.assets,
+      emailLogoUrl: branding.logoUrl,
+      ...(storedLogo
+        ? { certificateLogoUrl: branding.logoUrl, useBundledCertificateLogo: false }
+        : {}),
+    },
+    colors: {
+      ...brand.colors,
+      emailAccent: branding.primaryColor,
+      ...(storedColor ? { certificatePrimary: storedColor } : {}),
+    },
+    emailFooterText: branding.footerText,
+    emailWrapperHtml: branding.wrapperHtml,
+  };
+};
+
 export const renderBrandedEmailHtml = async ({ htmlBody, headerText, footerText }) => {
-  const branding = await getEmailBrandingConfig();
-  const defaultFooter = `This is an automated email from ${appName}.`;
+  const brand = await resolveGlobalBrandContext();
+  const defaultFooter = `This is an automated email from ${brand.productName}.`;
   const resolvedHeader = cleanPlainText(headerText) || defaultBranding.headerText;
-  const resolvedFooter = cleanPlainText(footerText) || branding.footerText || defaultFooter;
-  const wrapped = branding.wrapperHtml || getDefaultEmailBrandingTemplate();
+  const resolvedFooter = cleanPlainText(footerText) || brand.emailFooterText || defaultFooter;
+  const wrapped = brand.emailWrapperHtml || getDefaultEmailBrandingTemplate();
   return wrapped
-    .replaceAll('__APP_NAME__', appName)
-    .replaceAll('__LOGO_URL__', branding.logoUrl)
-    .replaceAll('__PRIMARY_COLOR__', branding.primaryColor)
+    .replaceAll('__APP_NAME__', brand.productName)
+    .replaceAll('__LOGO_URL__', brand.assets.emailLogoUrl)
+    .replaceAll('__PRIMARY_COLOR__', brand.colors.emailAccent)
     .replaceAll('__HEADER_TEXT__', resolvedHeader)
     .replaceAll('__FOOTER_TEXT__', resolvedFooter)
     .replaceAll('__EMAIL_BODY__', normalizeEmailBody(htmlBody));
@@ -844,21 +882,29 @@ export const getSecureUrl = url => {
 
 export const mailTemplate = async param => {
   const subject = `${param.senderName} has requested you to sign "${param.title}"`;
+  const senderName = escapeHtml(param.senderName);
+  const title = escapeHtml(param.title);
+  const senderMail = escapeHtml(param.senderMail);
+  const organization = escapeHtml(param.organization);
+  const localExpireDate = escapeHtml(param.localExpireDate);
+  const note = escapeHtml(param.note);
+  const signingUrl = escapeHtml(param.signingUrl);
+
   const body =
     `<div><p style='font-size:14px;margin-bottom:10px'>` +
-    param.senderName +
+    senderName +
     ' has requested you to review and sign <strong>' +
-    param.title +
+    title +
     "</strong>.</p><div style='padding: 5px 0px 5px 25px;display:flex;flex-direction:row;justify-content:space-around'><table><tr><td style='font-weight:bold;font-family:sans-serif;font-size:15px'>Sender</td><td></td><td style='color:#626363;font-weight:bold'>" +
-    param.senderMail +
+    senderMail +
     "</td></tr><tr><td style='font-weight:bold;font-family:sans-serif;font-size:15px'>Organization</td><td></td><td style='color:#626363;font-weight:bold'> " +
-    param.organization +
+    organization +
     "</td></tr><tr><td style='font-weight:bold;font-family:sans-serif;font-size:15px'>Expires on</td><td></td><td style='color:#626363;font-weight:bold'>" +
-    param.localExpireDate +
+    localExpireDate +
     "</td></tr><tr><td style='font-weight:bold;font-family:sans-serif;font-size:15px'>Note</td><td></td><td style='color:#626363;font-weight:bold'>" +
-    param.note +
+    note +
     "</td></tr><tr><td></td><td></td></tr></table></div> <div style='margin-left:70px'><a target=_blank href=" +
-    param.signingUrl +
+    signingUrl +
     "><button style='padding:12px;background-color:#d46b0f;color:white;border:0px;font-weight:bold;margin-top:30px'>Sign here</button></a></div><div style='display:flex;justify-content:center;margin-top:10px'></div></div>";
 
   return { subject, body };

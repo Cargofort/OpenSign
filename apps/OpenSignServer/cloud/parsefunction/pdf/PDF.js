@@ -7,9 +7,13 @@ import {
   replaceMailVaribles,
   saveFileUsage,
   getSecureUrl,
-  appName,
   serverAppId,
 } from '../../../Utils.js';
+import {
+  escapeHtml,
+  resolveBrandContext,
+  resolveDeploymentBrand,
+} from '../../../utils/brandContext.js';
 import GenerateCertificate from './GenerateCertificate.js';
 import { pdflibAddPlaceholder } from '@signpdf/placeholder-pdf-lib';
 import { Placeholder } from './Placeholder.js';
@@ -30,8 +34,9 @@ import {
 const serverUrl = cloudServerUrl; // process.env.SERVER_URL;
 const APPID = serverAppId;
 const masterKEY = process.env.MASTER_KEY;
-const eSignName = 'OpenSign';
-const eSigncontact = 'hello@opensignlabs.com';
+const deploymentBrand = resolveDeploymentBrand();
+const eSignName = deploymentBrand.digitalSignature.name;
+const eSigncontact = deploymentBrand.digitalSignature.contact;
 const docUrl = `${serverUrl}/classes/contracts_Document`;
 const headers = {
   'Content-Type': 'application/json',
@@ -141,7 +146,8 @@ async function updateDoc(
 // `sendNotifyMail` is used to send notification mail of signer signed the document
 async function sendNotifyMail(doc, signUser, mailProvider, publicUrl) {
   try {
-    const TenantAppName = appName;
+    const brand = resolveBrandContext({});
+    const TenantAppName = brand.productName;
     const auditTrailCount =
       doc?.AuditTrail?.filter(x => COMPLETION_ACTIVITIES.includes(x.Activity))?.length || 0;
     const completionRelevant =
@@ -158,13 +164,13 @@ async function sendNotifyMail(doc, signUser, mailProvider, publicUrl) {
       const viewDocUrl = `${publicUrl}/recipientSignPdf/${doc.objectId}`;
       const subject = `Document "${pdfName}" has been signed by ${signerName}`;
       const body =
-        `<p>Dear ${creatorName},</p>` +
-        `<p>${pdfName} has been signed by ${signerName} "${signerEmail}" successfully</p>` +
-        `<p><a href="${viewDocUrl}" target="_blank">View Document</a></p>`;
+        `<p>Dear ${escapeHtml(creatorName)},</p>` +
+        `<p>${escapeHtml(pdfName)} has been signed by ${escapeHtml(signerName)} "${escapeHtml(signerEmail)}" successfully</p>` +
+        `<p><a href="${escapeHtml(viewDocUrl)}" target="_blank">View Document</a></p>`;
 
       const params = {
         extUserId: sender.objectId,
-        from: TenantAppName,
+        from: brand.senderName,
         recipient: creatorEmail,
         subject: subject,
         pdfName: pdfName,
@@ -187,7 +193,7 @@ async function sendCompletedMail(obj) {
   const doc = obj.doc;
   const sender = obj.doc.ExtUserPtr;
   const pdfName = doc.Name;
-  const TenantAppName = appName;
+  const brand = resolveBrandContext({});
   let signersMail;
   if (doc?.Signers?.length > 0) {
     const isOwnerExistsinSigners = doc?.Signers?.find(x => x.Email === sender.Email);
@@ -199,7 +205,7 @@ async function sendCompletedMail(obj) {
   }
   const recipient = signersMail;
   let subject = `Document "${pdfName}" has been signed by all parties`;
-  let body = `<p>All parties have successfully signed the document <b>"${pdfName}"</b>. Kindly download the document from the attachment.</p>`;
+  let body = `<p>All parties have successfully signed the document <b>"${escapeHtml(pdfName)}"</b>. Kindly download the document from the attachment.</p>`;
 
   if (obj?.isCustomMail) {
     const tenant = sender?.TenantId;
@@ -264,7 +270,7 @@ async function sendCompletedMail(obj) {
   const params = {
     extUserId: sender.objectId,
     url: url,
-    from: doc?.SenderName || TenantAppName,
+    from: doc?.SenderName || brand.senderName,
     replyto: doc?.SenderMail || doc?.ExtUserPtr?.Email || '',
     recipient: recipient,
     subject: subject,
@@ -399,7 +405,7 @@ async function PDF(req) {
     const mailProvider = req.params.mailProvider || '';
     const sign = req.params.signature || '';
     const auditActivity = 'Signed';
-    const publicUrl = req.headers.public_url;
+    let publicUrl = req.headers.public_url;
     // below bode is used to get info of docId
     const docQuery = new Parse.Query('contracts_Document');
     docQuery.include('ExtUserPtr,Signers,ExtUserPtr.TenantId,Bcc,Cc,CreatedBy');
@@ -501,7 +507,7 @@ async function PDF(req) {
       let signedFilePath = `./exports/signed_${name}`;
       let pdfSize = PdfBuffer.length;
       let documentHash;
-      if (isCompleted) {
+      if (!req.params.isQES && isCompleted) {
         const signersName = _resDoc.Signers?.map(x => x.Name + ' <' + x.Email + '>');
         const reason =
           signersName && signersName.length > 0
@@ -520,7 +526,7 @@ async function PDF(req) {
         pdfSize = signedDocs.length;
         documentHash = generateDocumentHash(signedDocs);
         console.log(`✅ PDF digitally signed created: ${signedFilePath} \n`);
-      } else {
+      } else if (!req.params.isQES) {
         //`saveUrl` is used to save signed pdf in exports folder
         fs.writeFileSync(signedFilePath, PdfBuffer);
         pdfSize = PdfBuffer.length;

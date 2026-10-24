@@ -1,14 +1,19 @@
 import axios from 'axios';
 import dotenv from 'dotenv';
 dotenv.config({ quiet: true });
-const ssoApiUrl = process.env.SSO_API_URL || 'https://sso.opensignlabs.com/api';
-const ssoUserinfoPath = process.env.SSO_USERINFO_PATH || '/oauth/userinfo';
-const ssoAllowedGroups = process.env.SSO_ALLOWED_GROUPS
-  ? process.env.SSO_ALLOWED_GROUPS.split(',').map((g) => g.trim()).filter(Boolean)
-  : null;
-const ssoGroupsClaim = process.env.SSO_GROUPS_CLAIM || 'groups';
+const getSsoApiUrl = () => {
+  return process.env.SSO_API_URL || 'https://sso.opensignlabs.com/api';
+};
+const getSsoUserinfoPath = () => process.env.SSO_USERINFO_PATH || '/oauth/userinfo';
+const getSsoAllowedGroups = () =>
+  process.env.SSO_ALLOWED_GROUPS
+    ? process.env.SSO_ALLOWED_GROUPS.split(',').map((g) => g.trim()).filter(Boolean)
+    : null;
+const getSsoGroupsClaim = () => process.env.SSO_GROUPS_CLAIM || 'groups';
 
 function assertInternalUser(userInfo) {
+  const ssoAllowedGroups = getSsoAllowedGroups();
+  const ssoGroupsClaim = getSsoGroupsClaim();
   if (!ssoAllowedGroups || ssoAllowedGroups.length === 0) return;
   const userGroups = userInfo[ssoGroupsClaim];
   const groups = Array.isArray(userGroups) ? userGroups : [];
@@ -30,7 +35,7 @@ export const SSOAuth = {
   // Returns a promise that fulfills if this user mail is valid.
   validateAuthData: async authData => {
     try {
-      const userinfoUrl = ssoApiUrl.replace(/\/$/, '') + ssoUserinfoPath;
+      const userinfoUrl = getSsoApiUrl().replace(/\/$/, '') + getSsoUserinfoPath();
       const response = await axios.get(userinfoUrl, {
         headers: {
           Authorization: `Bearer ${authData.access_token}`,

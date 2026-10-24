@@ -26,6 +26,7 @@ import {
   smtpsecure,
   useLocal,
 } from './Utils.js';
+import { resolveDeploymentBrand } from './utils/brandContext.js';
 import { SSOAuth } from './auth/authadapter.js';
 import runDbMigrations from './migrationdb/index.js';
 import { validateSignedLocalUrl } from './cloud/parsefunction/getSignedUrl.js';
@@ -112,7 +113,7 @@ if (smtpenable) {
 if (isMailAdapter) {
   try {
     const resolvedSender = getResolvedMailSender({ isSmtp: smtpenable });
-    senderAddress = formatFromHeader(appName, resolvedSender);
+    senderAddress = formatFromHeader(resolveDeploymentBrand().senderName, resolvedSender);
     if (smtpenable) {
       smtpEnvelopeFrom = getSmtpEnvelopeFrom(resolvedSender);
     }
@@ -226,16 +227,22 @@ app.use(function (req, res, next) {
   next();
 });
 function getUserIP(request) {
-  let forwardedFor = request.headers['x-forwarded-for'];
-  if (forwardedFor) {
-    if (forwardedFor.indexOf(',') > -1) {
-      return forwardedFor.split(',')[0];
-    } else {
-      return forwardedFor;
-    }
-  } else {
-    return request.socket.remoteAddress;
+  const cloudflareIp = request.headers['cf-connecting-ip'];
+  if (typeof cloudflareIp === 'string' && cloudflareIp.trim()) {
+    return cloudflareIp.trim();
   }
+
+  const forwardedFor = request.headers['x-forwarded-for'];
+  if (typeof forwardedFor === 'string' && forwardedFor.trim()) {
+    return forwardedFor.split(',')[0].trim();
+  }
+
+  const realIp = request.headers['x-real-ip'];
+  if (typeof realIp === 'string' && realIp.trim()) {
+    return realIp.trim();
+  }
+
+  return request.socket?.remoteAddress || '';
 }
 
 app.use(async function (req, res, next) {
@@ -288,6 +295,13 @@ if (!process.env.TESTING) {
   // Set the Keep-Alive and headers timeout to 100 seconds
   httpServer.keepAliveTimeout = 100000; // in milliseconds
   httpServer.headersTimeout = 100000; // in milliseconds
+  try {
+    await runDbMigrations();
+  } catch (error) {
+    // Don't let a migration failure prevent the server from listening,
+    // otherwise the platform's readiness probe never succeeds and the deploy is killed.
+    console.error('Database migration failed:', error);
+  }
   httpServer.listen(port, '0.0.0.0', function () {
     console.log('opensign-server running on port ' + port + '.');
     if (process.env.WEBHOOK_URL && !process.env.WEBHOOK_SECRET) {
@@ -299,7 +313,6 @@ if (!process.env.TESTING) {
     }
     const isWindows = process.platform === 'win32';
     // console.log('isWindows', isWindows);
-    runDbMigrations();
     const migrate = isWindows
       ? `set APPLICATION_ID=${serverAppId}&& set SERVER_URL=${cloudServerUrl}&& set MASTER_KEY=${process.env.MASTER_KEY}&& npx parse-dbtool migrate`
       : `APPLICATION_ID=${serverAppId} SERVER_URL=${cloudServerUrl} MASTER_KEY=${process.env.MASTER_KEY} npx parse-dbtool migrate`;

@@ -13,6 +13,7 @@ import { appInfo } from "../constant/appinfo";
 import Parse from "parse";
 import { useTranslation } from "react-i18next";
 import SelectLanguage from "../components/pdf/SelectLanguage";
+import SourceNotice from "../components/SourceNotice";
 import LoaderWithMsg from "../primitives/LoaderWithMsg";
 import ModalUi from "../primitives/ModalUi";
 import Loader from "../primitives/Loader";
@@ -483,6 +484,7 @@ function GuestLogin() {
             )}
           </div>
           <SelectLanguage />
+          <SourceNotice className="mt-3 text-center" />
         </div>
       )}
     </div>

@@ -140,6 +140,7 @@ function sanitizeRuntimeConfig(value) {
     "app",
     "api",
     "publicProfile",
+    "github",
     "docs",
     "support",
     "terms",

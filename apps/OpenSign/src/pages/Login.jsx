@@ -19,6 +19,7 @@ import {
 import Loader from "../primitives/Loader";
 import { useTranslation } from "react-i18next";
 import SelectLanguage from "../components/pdf/SelectLanguage";
+import SourceNotice from "../components/SourceNotice";
 
 function Login() {
   const appName =
@@ -688,6 +689,7 @@ function Login() {
               <div className="os-login-language">
                 <SelectLanguage />
               </div>
+              <SourceNotice className="mt-3 text-center" />
               {state.alertMsg && (
                 <Alert type={state.alertType}>{state.alertMsg}</Alert>
               )}

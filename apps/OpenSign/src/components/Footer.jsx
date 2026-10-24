@@ -3,6 +3,7 @@ import Package from "../../package.json";
 import axios from "axios";
 import { useTranslation } from "react-i18next";
 import { getRuntimeConfig } from "../constant/runtimeConfig";
+import SourceNotice from "./SourceNotice";
 const Footer = () => {
   const { brandKey, productName: appName } = getRuntimeConfig();
   const isOpenSign = brandKey === "opensign";
@@ -87,6 +88,7 @@ const Footer = () => {
               <span>{versionLabel}</span>
             )}
           </p>
+          <SourceNotice />
         </aside>
       </footer>
       <button
